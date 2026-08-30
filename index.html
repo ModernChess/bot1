@@ -1,1 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Turn Pathfinder Test - Priority Fields (Optimized)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+            padding-bottom: 160px;
+            box-sizing: border-box;
+        }
+
+        h2 {
+            margin: 5px 0 10px 0;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 600px;
+            box-sizing: border-box;
+        }
+
+        .grid-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border: 2px solid #555;
+            background-color: #444;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(18, 24px);
+            grid-template-rows: repeat(18, 24px);
+            gap: 1px;
+            background-color: #444;
+            width: max-content;
+        }
+
+        .cell {
+            width: 24px;
+            height: 24px;
+            background-color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            font-size: 8px;
+            user-select: none;
+        }
+
+        /* Updated Water color to Deep Navy Blue */
+        .cell.water {
+            background-color: #000080 !important;
+            cursor: not-allowed;
+        }
+
+        /* Custom Board Feature Styles (Barely Visible / High Transparency) */
+        .cell.rc         { background-color: rgba(139, 0, 0, 0.15) !important; } /* Dark Red */
+        .cell.bc         { background-color: rgba(0, 0, 139, 0.15) !important; } /* Dark Blue */
+        .cell.base       { background-color: rgba(173, 216, 230, 0.12) !important; } /* Light Blue */
+        .cell.gold-core  { background-color: rgba(184, 134, 11, 0.15) !important; } /* Dark Yellow/Gold */
+        .cell.gold-tile  { background-color: rgba(255, 215, 0, 0.1) !important; } /* Yellow */
+        .cell.port       { background-color: rgba(128, 0, 128, 0.15) !important; } /* Purple */
+
+        .cell.valid-click {
+            background-color: #27ae60 !important;
+        }
+        .cell.invalid-click {
+            box-shadow: inset 0 0 0 2px #e74c3c !important;
+        }
+
+        .cell.turn-1-path  { background-color: rgba(41, 128, 185, 0.4) !important; }
+        .cell.turn-1-end   { background-color: #2980b9 !important; }
+        .cell.turn-2-path  { background-color: rgba(142, 68, 173, 0.4) !important; }
+        .cell.turn-2-end   { background-color: #8e44ad !important; }
+        .cell.turn-3-path  { background-color: rgba(211, 84, 0, 0.4) !important; }
+        .cell.turn-3-end   { background-color: #d35400 !important; }
+        .cell.turn-4-path  { background-color: rgba(22, 160, 133, 0.4) !important; }
+        .cell.turn-4-end   { background-color: #16a085 !important; }
+        .cell.turn-5-path  { background-color: rgba(241, 196, 15, 0.4) !important; }
+        .cell.turn-5-end   { background-color: #f1c40f !important; color: #000 !important; }
+        .cell.turn-6-path  { background-color: rgba(230, 126, 34, 0.4) !important; }
+        .cell.turn-6-end   { background-color: #e67e22 !important; }
+        .cell.turn-7-path  { background-color: rgba(46, 204, 113, 0.4) !important; }
+        .cell.turn-7-end   { background-color: #2ecc71 !important; }
+        .cell.turn-8-path  { background-color: rgba(52, 152, 219, 0.4) !important; }
+        .cell.turn-8-end   { background-color: #3498db !important; }
+        .cell.turn-9-path  { background-color: rgba(155, 89, 182, 0.4) !important; }
+        .cell.turn-9-end   { background-color: #9b59b6 !important; }
+        .cell.turn-10-path { background-color: rgba(26, 188, 156, 0.4) !important; }
+        .cell.turn-10-end  { background-color: #1abc9c !important; }
+        .cell.turn-11-path { background-color: rgba(231, 76, 60, 0.4) !important; }
+        .cell.turn-11-end  { background-color: #e74c3c !important; }
+        .cell.turn-12-path { background-color: rgba(52, 73, 94, 0.4) !important; }
+        .cell.turn-12-end  { background-color: #34495e !important; }
+        .cell.turn-13-path { background-color: rgba(243, 156, 18, 0.4) !important; }
+        .cell.turn-13-end  { background-color: #f39c12 !important; }
+        .cell.turn-14-path { background-color: rgba(127, 140, 141, 0.4) !important; }
+        .cell.turn-14-end  { background-color: #7f8c8d !important; }
+        .cell.turn-15-path { background-color: rgba(210, 180, 222, 0.4) !important; }
+        .cell.turn-15-end  { background-color: #8e44ad !important; }
+
+        .turn-marker {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background-color: #000000;
+            border-radius: 50%;
+            top: 1px;
+            right: 1px;
+            z-index: 2;
+        }
+
+        .turn-label {
+            position: absolute;
+            bottom: 0px;
+            right: 1px;
+            font-size: 8px;
+            font-weight: bold;
+            color: #ffffff;
+            z-index: 2;
+        }
+
+        .unit {
+            width: 18px;
+            height: 18px;
+            background-color: #e74c3c;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 9px;
+            color: white;
+            z-index: 3;
+        }
+
+        .unit.selected {
+            box-shadow: 0 0 0 2px cyan;
+            background-color: #3498db;
+        }
+
+        .priority-unit {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 7px;
+            color: white;
+            z-index: 3;
+            cursor: pointer;
+        }
+        .priority-unit.positive { background-color: #27ae60; }
+        .priority-unit.negative { background-color: #c0392b; }
+        .priority-unit.neutral  { background-color: #7f8c8d; }
+        .priority-unit.selected { box-shadow: 0 0 0 2px yellow; }
+
+        #info-panel {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #aaa;
+            text-align: center;
+        }
+
+        #turn-breakdown {
+            margin-top: 4px;
+            font-size: 11px;
+            color: #3498db;
+            text-align: center;
+            word-break: break-word;
+            font-weight: bold;
+        }
+
+        #next-turn-btn {
+            margin-top: 8px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+            display: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        #next-turn-btn:hover {
+            background-color: #219653;
+        }
+
+        #custom-console {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 140px;
+            background-color: #1e1e1e;
+            border-top: 2px solid #444;
+            color: #d4d4d4;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.6);
+            transition: height 0.3s ease;
+        }
+
+        #custom-console.minimized {
+            height: 28px !important;
+        }
+
+        #console-header {
+            background-color: #2d2d2d;
+            padding: 4px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #444;
+            user-select: none;
+        }
+
+        #console-title {
+            font-weight: bold;
+            color: #9cdcfe;
+            font-size: 11px;
+        }
+
+        #console-toggle-btn {
+            background: #3c3c3c;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 2px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+        }
+
+        #console-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            text-align: left;
+        }
+
+        .console-log-item {
+            padding: 2px 4px;
+            border-bottom: 1px solid #282828;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .console-log-item.log { color: #d4d4d4; }
+        .console-log-item.info { color: #3794ff; }
+        .console-log-item.warn { color: #cca70a; background-color: rgba(204, 167, 10, 0.1); }
+        .console-log-item.error { color: #f14c4c; background-color: rgba(241, 76, 76, 0.15); }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <h2>Vector Turn Pathfinder Test - Priority Fields (Optimized)</h2>
+        <div class="grid-wrapper">
+            <div class="grid" id="grid"></div>
+        </div>
+        <div id="info-panel">Click a pathing unit to select, then click any tile. Click a priority unit to select and move it!</div>
+        <div id="turn-breakdown"></div>
+        <button id="next-turn-btn" onclick="executeNextTurn()">Go to Next Turn</button>
+    </div>
+
+    <div id="custom-console">
+        <div id="console-header">
+            <span id="console-title">Console Output (High-Performance Engine)</span>
+            <button id="console-toggle-btn" onclick="toggleConsole()">Minimize</button>
+        </div>
+        <div id="console-body"></div>
+    </div>
+
+    <!-- Script Links Integration -->
+    <script src="console.js"></script>
+    <script src="config.js"></script>
+    <script src="pathfinder.js"></script>
+</body>
+</html>
 
