@@ -3,27 +3,28 @@
 <head> <!-- Head section for page metadata, title, and CSS styles -->
     <meta charset="UTF-8"> <!-- Sets character encoding standard to UTF-8 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Ensures proper responsive scaling on mobile devices -->
-    <title>Modern Chess - Menu</title> <!-- Title shown on the browser tab -->
+    <title>mchess ai</title> <!-- Title shown on the browser tab -->
     <style>
         :root { /* Defines global CSS variable color themes */
-            --bg-color: #111; /* Dark background fill */
-            --panel-bg: #1a1a1a; /* Dark gray panel container background */
-            --border-color: #333; /* Standard border line outline color */
-            --accent-green: #2ecc71; /* Green highlight for confirm actions */
-            --accent-blue: #3498db; /* Blue highlight color */
-            --text-main: #ffffff; /* Primary white text color */
-            --text-muted: #aaaaaa; /* Subdued gray text color */
+            --bg-color: #0b0f19; /* Deep futuristic dark background fill */
+            --panel-bg: #131b2e; /* Dark slate panel container background */
+            --border-color: #1e293b; /* Standard border line outline color */
+            --accent-green: #10b981; /* Neon green highlight for confirm actions */
+            --accent-blue: #3b82f6; /* Electric blue highlight color */
+            --accent-gold: #f59e0b; /* Golden shop button color */
+            --text-main: #f8fafc; /* Primary bright white text color */
+            --text-muted: #94a3b8; /* Subdued gray-blue text color */
         }
 
         body { /* Global body element style layout rules */
             margin: 0;
-            background: var(--bg-color);
+            background: radial-gradient(circle at center, #1e293b 0%, var(--bg-color) 100%);
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             overflow-y: auto; /* Allows safe scrolling if zoomed in */
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             touch-action: manipulation;
             color: var(--text-main);
             padding: 10px;
@@ -37,113 +38,17 @@
             min-height: 90vh;
             max-height: 95vh;
             background: var(--panel-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
             flex-direction: column;
             box-sizing: border-box;
             position: relative;
             overflow-y: auto; /* Prevents button clipping during zoom-ins */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
 
         .screen.active { /* Makes the target screen visible when active */
             display: flex;
-        }
-
-        .screen-header { /* Header container at top of menu screens */
-            display: flex;
-            align-items: center;
-            padding: 16px;
-            border-bottom: 1px solid var(--border-color);
-            background: #222;
-        }
-
-        .back-btn { /* Return navigation button style */
-            background: #444;
-            color: white;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-shrink: 0;
-        }
-
-        .screen-title { /* Centered header title text style */
-            margin: 0;
-            flex-grow: 1;
-            text-align: center;
-            font-size: 18px;
-            padding-right: 40px;
-        }
-
-        .version-badge { /* Software version display pill badge */
-            background: #222;
-            border: 1px solid var(--border-color);
-            color: var(--text-muted);
-            padding: 6px 12px;
-            border-radius: 16px;
-            font-size: 12px;
-            font-weight: bold;
-            align-self: center;
-            margin-top: auto;
-            margin-bottom: 8px;
-        }
-
-        .screen-body { /* Scrollable body container for menu options */
-            padding: 20px;
-            overflow-y: auto;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .menu-btn { /* Interactive menu navigation button layout */
-            background: #262626;
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            padding: 16px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: left;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .menu-btn.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .board-option-card { /* Card layout container for board options */
-            background: #222;
-            border: 2px solid var(--border-color);
-            padding: 16px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .board-option-card.default-board { /* Highlights default board card choice */
-            border-color: var(--accent-green);
-        }
-
-        .confirm-btn { /* Selection confirmation action button */
-            background: var(--accent-green);
-            color: #111;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
         }
 
         #game-screen { /* Game screen specific container layout */
@@ -152,105 +57,147 @@
         }
 
         canvas { /* HTML5 Canvas game board element styling */
-            background: #222;
-            border: 2px solid #444;
+            background: #111827;
+            border: 2px solid #374151;
+            border-radius: 8px;
             display: block;
             width: 80vw;
             height: 80vw;
             max-width: 420px;
             max-height: 420px;
             margin: 10px auto;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
         }
 
         .game-top-bar { /* HUD top bar container above the canvas */
             width: 100%;
-            padding: 10px 20px;
+            padding: 14px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-sizing: border-box;
             flex-shrink: 0;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(8px);
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+        }
+
+        /* Stylised Logo & AI Badge Section */
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand-logo {
+            height: 22px; /* Matches the text-height size from earlier */
+            width: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+        }
+
+        .ai-badge {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            font-size: 10px;
+            font-weight: 900;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
         }
 
         /* Shop UI Button & Modal Styles */
         #shop-btn {
-            background-color: #f1c40f;
-            color: #121212;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #0f172a;
             border: none;
             padding: 8px 14px;
-            font-weight: bold;
+            font-weight: 800;
             font-size: 13px;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-            transition: background 0.2s;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+            transition: all 0.2s ease;
         }
         #shop-btn:hover {
-            background-color: #f39c12;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
         }
+
         #shop-modal {
             display: none;
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(20, 20, 20, 0.98);
-            border: 2px solid #f1c40f;
-            padding: 15px;
-            border-radius: 10px;
+            background: #1e293b;
+            border: 2px solid #f59e0b;
+            padding: 20px;
+            border-radius: 14px;
             width: 90%;
-            max-width: 300px;
+            max-width: 320px;
             z-index: 20;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
             box-sizing: border-box;
             max-height: 80vh;
             overflow-y: auto;
         }
         #shop-modal h3 {
             margin-top: 0;
-            color: #f1c40f;
+            color: #f59e0b;
             text-align: center;
             text-transform: uppercase;
             letter-spacing: 1px;
-            font-size: 16px;
+            font-size: 15px;
+            font-weight: 800;
         }
         .shop-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin: 8px 0;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 8px 10px;
-            border-radius: 5px;
+            margin: 10px 0;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 10px 12px;
+            border-radius: 8px;
             font-size: 13px;
+            border: 1px solid var(--border-color);
+        }
+        .shop-item span {
+            font-weight: 500;
         }
         .shop-item button {
-            background-color: #27ae60;
-            color: white;
+            background-color: var(--accent-green);
+            color: #0f172a;
             border: none;
             padding: 6px 12px;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 800;
             font-size: 12px;
             flex-shrink: 0;
+            transition: background 0.2s;
         }
         .shop-item button:hover {
-            background-color: #2ecc71;
+            background-color: #34d399;
         }
         #close-shop {
             width: 100%;
-            margin-top: 10px;
-            background-color: #c0392b;
+            margin-top: 14px;
+            background-color: #ef4444;
             color: white;
             border: none;
-            padding: 8px;
-            border-radius: 4px;
-            font-weight: bold;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 800;
             cursor: pointer;
+            transition: background 0.2s;
         }
         #close-shop:hover {
-            background-color: #e74c3c;
+            background-color: #dc2626;
         }
 
         /* Artillery Card Duel Modal Styles */
@@ -260,27 +207,28 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(20, 20, 20, 0.98);
-            border: 2px solid #e74c3c;
+            background: #1e293b;
+            border: 2px solid #ef4444;
             padding: 20px;
-            border-radius: 12px;
+            border-radius: 14px;
             width: 90%;
             max-width: 320px;
             z-index: 30;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
             box-sizing: border-box;
             text-align: center;
         }
         #artillery-card-modal h3 {
             margin-top: 0;
-            color: #e74c3c;
+            color: #ef4444;
             text-transform: uppercase;
             letter-spacing: 1px;
-            font-size: 18px;
+            font-size: 16px;
+            font-weight: 800;
         }
         #artillery-card-modal p {
             color: var(--text-muted);
-            font-size: 14px;
+            font-size: 13px;
             margin-bottom: 15px;
         }
         .card-duel-options {
@@ -291,61 +239,34 @@
         }
         .duel-card-btn {
             padding: 10px 16px;
-            font-weight: bold;
-            font-size: 14px;
+            font-weight: 800;
+            font-size: 13px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             color: #fff;
+            transition: transform 0.1s;
+        }
+        .duel-card-btn:active {
+            transform: scale(0.96);
         }
         .duel-card-btn.green {
-            background-color: #27ae60;
-        }
-        .duel-card-btn.green:hover {
-            background-color: #2ecc71;
+            background-color: #10b981;
         }
         .duel-card-btn.red {
-            background-color: #c0392b;
-        }
-        .duel-card-btn.red:hover {
-            background-color: #e74c3c;
+            background-color: #ef4444;
         }
     </style>
 </head>
 <body> <!-- Document body containing all UI screen views -->
 
-    <!-- Main Menu Screen View -->
-    <div id="main-screen" class="screen active">
-        <div class="screen-header" style="justify-content: center;">
-            <h2 class="screen-title" style="padding-right: 0;">Modern Chess</h2>
-        </div>
-        <div class="screen-body" style="justify-content: center;">
-            <button class="menu-btn" onclick="navigateTo('offline-options-screen')">Play</button>
-            <button class="menu-btn disabled" onclick="event.preventDefault();">How to Play</button>
-            <button class="menu-btn disabled" onclick="event.preventDefault();">Files Manager</button>
-            <button class="menu-btn disabled" onclick="event.preventDefault();">Settings</button>
-            <div class="version-badge">v1.007</div>
-        </div>
-    </div>
-
-    <!-- Offline Options Selection Screen View -->
-    <div id="offline-options-screen" class="screen">
-        <div class="screen-header">
-            <button class="back-btn" onclick="navigateTo('main-screen')">Back</button>
-            <h2 class="screen-title">Select Board</h2>
-        </div>
-        <div class="screen-body">
-            <div class="board-option-card default-board">
-                <div class="board-info"><h3 style="margin:0;">Basic Board (Default)</h3></div>
-                <button class="confirm-btn" onclick="navigateTo('game-screen')">Confirm</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Active Match Gameplay Screen View -->
-    <div id="game-screen" class="screen">
+    <!-- Active Match Gameplay Screen View (Direct Load) -->
+    <div id="game-screen" class="screen active">
         <div class="game-top-bar">
-            <button class="back-btn" onclick="navigateTo('offline-options-screen')">Back</button>
+            <div class="brand-container">
+                <img src="https://raw.githubusercontent.com/ModernChess/assets-images/main/mchess.png" alt="mchess logo" class="brand-logo" onerror="this.style.display='none'">
+                <span class="ai-badge">ai</span>
+            </div>
             <button id="shop-btn" onclick="toggleShop()">🛒 Open Shop</button>
         </div>
         <div style="display:flex; justify-content:center; align-items:center; flex-grow:1; position:relative; width: 100%;">
@@ -387,24 +308,7 @@
 
     <!-- Screen Navigation Controller Script -->
     <script>
-        console.log("[INFO][index_html] DOM content fully parsed, initializing UI navigation controller.");
-
-        function navigateTo(screenId) {
-            console.log(`[INFO][index_html] Attempting navigation to screen: '${screenId}'`);
-            
-            const targetScreen = document.getElementById(screenId);
-            if (!targetScreen) {
-                console.error(`[ERROR][index_html] Navigation failed: Screen element with ID '${screenId}' does not exist.`);
-                return;
-            }
-
-            document.querySelectorAll('.screen').forEach(screen => {
-                screen.classList.remove('active');
-            });
-
-            targetScreen.classList.add('active');
-            console.log(`[SUCCESS][index_html] Successfully navigated to screen: '${screenId}'`);
-        }
+        console.log("[INFO][index_html] DOM content fully parsed, initializing UI controller.");
 
         // Global window error listener for robust client-side error tracing and chat box parsing
         window.addEventListener('error', function(event) {
@@ -416,8 +320,7 @@
         });
     </script>
 
-    <!-- REQUIRED SCRIPT LOAD ORDER -->
-    <script src="console.js" onerror="console.error('[ERROR][index_html] Failed to load script: console.js');"></script>
+    <!-- REQUIRED SCRIPT LOAD ORDER (console.js excluded) -->
     <script src="map_setup.js" onerror="console.error('[ERROR][index_html] Failed to load script: map_setup.js');"></script>
     <script src="team_core.js" onerror="console.error('[ERROR][index_html] Failed to load script: team_core.js');"></script>
     <script src="combat_mechanics.js" onerror="console.error('[ERROR][index_html] Failed to load script: combat_mechanics.js');"></script>
