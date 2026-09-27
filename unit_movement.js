@@ -4,7 +4,6 @@
 
 let selectedUnit = null;     
 let legalMoves = [];         
-let targetTile = null;       
 let pressTimer = null;       
 let rangeMode = false;
 let rangeSquares = [];
@@ -95,6 +94,10 @@ function getLegalMoves(unit) {
             if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) {
                 if (typeof isGoldCore === 'function' && isGoldCore(nc, nr)) break;
 
+                // Stop pathing through any occupied square (friendly or enemy unit)
+                let isOccupied = units.some(u => u.gridX === nc && u.gridY === nr);
+                if (isOccupied) break;
+
                 let terrain = getTerrain(nc, nr);
                 let isWater = isWaterTerrain(terrain);
                 let validTerrain = false;
@@ -113,12 +116,10 @@ function getLegalMoves(unit) {
     return moves;
 }
 
-// Updates movement coordinates, calculates rotational heading, checks stalemates, handles Gold Cores, and triggers combat resolution
 function tryMoveUnit(unit, newC, newR) {
     if (typeof gameOver !== 'undefined' && gameOver) return false;
     if (!unit) return false;
 
-    // Enforce stalemate locks if defined in combat mechanics[span_3](start_span)[span_3](end_span)
     if (typeof isUnitLockedInStalemate === 'function' && isUnitLockedInStalemate(unit, units)) {
         SystemLog.warn(`Move ignored: Unit is locked in a stalemate.`);
         return false;
@@ -127,7 +128,6 @@ function tryMoveUnit(unit, newC, newR) {
     let oldC = unit.gridX;
     let oldR = unit.gridY;
 
-    // Calculate rotational heading angle towards target[span_4](start_span)[span_4](end_span)
     let dx = newC - oldC;
     let dy = newR - oldR;
     if (dx !== 0 || dy !== 0) {
@@ -139,7 +139,6 @@ function tryMoveUnit(unit, newC, newR) {
     let movingTeam = getTeamFromUnit(unit);
     let movingPower = typeof getUnitPower === 'function' ? getUnitPower(unit) : 0;
 
-    // Check Gold Core and Capture Zone interaction[span_5](start_span)[span_5](end_span)[span_6](start_span)[span_6](end_span)
     if (typeof goldCores !== 'undefined') {
         goldCores.forEach(core => {
             let inCoreItself = (core.c === newC && core.r === newR);
@@ -160,10 +159,12 @@ function tryMoveUnit(unit, newC, newR) {
                             if (typeof flagAnimations !== 'undefined') {
                                 flagAnimations[core.id] = performance.now();
                             }
-                            if (movingTeam === 'blue' && typeof blueCoins !== 'undefined') {
-                                blueCoins += 1;
-                            } else if (movingTeam === 'red' && typeof redCoins !== 'undefined') {
-                                redCoins += 1;
+                            if (movingTeam === 'blue') {
+                                if (typeof window.rewardHumanCapture === 'function') {
+                                    window.rewardHumanCapture();
+                                } else if (typeof rewardHumanCapture === 'function') {
+                                    rewardHumanCapture();
+                                }
                             }
                             SystemLog.success(`Gold core ${core.id} captured by ${movingTeam}!`);
                         }
@@ -172,10 +173,12 @@ function tryMoveUnit(unit, newC, newR) {
                         if (typeof flagAnimations !== 'undefined') {
                             flagAnimations[core.id] = performance.now();
                         }
-                        if (movingTeam === 'blue' && typeof blueCoins !== 'undefined') {
-                            blueCoins += 1;
-                        } else if (movingTeam === 'red' && typeof redCoins !== 'undefined') {
-                            redCoins += 1;
+                        if (movingTeam === 'blue') {
+                            if (typeof window.rewardHumanCapture === 'function') {
+                                window.rewardHumanCapture();
+                            } else if (typeof rewardHumanCapture === 'function') {
+                                rewardHumanCapture();
+                            }
                         }
                         SystemLog.success(`Neutral gold core ${core.id} claimed by ${movingTeam}!`);
                     }
@@ -184,11 +187,13 @@ function tryMoveUnit(unit, newC, newR) {
         });
     }
 
-    // Update grid positions
     unit.gridX = newC;
     unit.gridY = newR;
 
-    // Resolve combat interactions (tanks destroying adjacent units upon touch)[span_7](start_span)[span_7](end_span)
+    if (typeof window.triggerMoveSound === 'function') {
+        window.triggerMoveSound(unit.name);
+    }
+
     if (typeof resolveUnitInteractions === 'function') {
         resolveUnitInteractions(units);
     }
@@ -197,6 +202,11 @@ function tryMoveUnit(unit, newC, newR) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
+    if (typeof currentTurn !== 'undefined' && currentTurn === 'red') {
+        SystemLog.warn('Input ignored: It is currently Red bot turn. Human control is locked.');
+        return;
+    }
+
     let rect = canvas.getBoundingClientRect();
     let scaleX = canvas.width / rect.width;
     let scaleY = canvas.height / rect.height;
@@ -210,12 +220,28 @@ canvas.addEventListener('pointerdown', (e) => {
     if (!validateCoordinates(c, r)) return;
 
     if (r >= 0 && r < rows && c >= 0 && c < cols) {
-        let clickedUnit = units.find(u => u.gridX === c && u.gridY === r);
+        let clickedUnit = units.find(u => u.gridX === c && u.gridY === r && !u.invisible);
+
+        if (selectedUnit && !rangeMode) {
+            let matchedLegalMove = legalMoves.find(m => m.c === c && m.r === r);
+            if (matchedLegalMove) {
+                let success = tryMoveUnit(selectedUnit, c, r);
+                if (success) {
+                    selectedUnit = null;
+                    legalMoves = [];
+
+                    if (typeof currentTurn !== 'undefined') {
+                        currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
+                        SystemLog.success(`Instant move complete. Turn switched to: ${currentTurn}`);
+                    }
+                }
+                return;
+            }
+        }
 
         if (clickedUnit) {
             let unitTeam = getTeamFromUnit(clickedUnit);
             
-            // Artillery combat range trigger
             if (selectedUnit && rangeMode && (selectedUnit.name || '').includes('Artillery')) {
                 let attackerTeam = getTeamFromUnit(selectedUnit);
                 if (unitTeam !== attackerTeam) {
@@ -238,7 +264,6 @@ canvas.addEventListener('pointerdown', (e) => {
                 }
             }
 
-            // Enforce turn check if currentTurn exists globally
             if (typeof currentTurn !== 'undefined' && unitTeam !== currentTurn) {
                 SystemLog.warn(`Ignored selection: It is team '${currentTurn}' turn, but clicked team '${unitTeam}' unit.`);
                 return; 
@@ -247,8 +272,11 @@ canvas.addEventListener('pointerdown', (e) => {
             pressTimer = setTimeout(() => {
                 selectedUnit = clickedUnit;
                 legalMoves = getLegalMoves(clickedUnit);
-                targetTile = null; 
                 rangeMode = false; 
+
+                if (typeof window.triggerSelectSound === 'function') {
+                    window.triggerSelectSound(clickedUnit.name);
+                }
             }, 5); 
         } else {
             if (selectedUnit && ((selectedUnit.name || '').includes('Ship') || (selectedUnit.name || '').includes('Artillery'))) {
@@ -263,26 +291,9 @@ canvas.addEventListener('pointerdown', (e) => {
                 }
             }
 
-            if (selectedUnit && !rangeMode) {
-                let isLegal = legalMoves.some(m => m.c === c && m.r === r);
-                if (isLegal) {
-                    if (targetTile && targetTile.c === c && targetTile.r === r) {
-                        let success = tryMoveUnit(selectedUnit, c, r);
-                        if (success) {
-                            selectedUnit = null;
-                            legalMoves = [];
-                            targetTile = null;
-
-                            // Switch turn cycle successfully if currentTurn is defined globally[span_8](start_span)[span_8](end_span)[span_9](start_span)[span_9](end_span)
-                            if (typeof currentTurn !== 'undefined') {
-                                currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
-                                SystemLog.success(`Move complete. Turn switched to: ${currentTurn}`);
-                            }
-                        }
-                    } else {
-                        targetTile = { c: c, r: r };
-                    }
-                }
+            if (!rangeMode) {
+                selectedUnit = null;
+                legalMoves = [];
             }
         }
     }
@@ -291,7 +302,6 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointerup', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
 canvas.addEventListener('pointercancel', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
 
-// Helper to draw rotated units scaled 30% larger (cellSize * 1.3)
 function drawRotatedUnit(ctx, img, renderX, renderY, size, facingDegrees = 0) {
     ctx.save();
     let centerX = renderX + cellSize / 2;
@@ -344,15 +354,25 @@ function update() {
                 ctx.strokeRect(px + 2, py + 2, pWidth - 4, pHeight - 4);
             });
         } else {
-            ctx.strokeStyle = '#ff8000';
-            ctx.lineWidth = 3;
             legalMoves.forEach(m => {
-                ctx.strokeRect(m.c * cellSize + 2, m.r * cellSize + 2, cellSize - 4, cellSize - 4);
+                let cx = m.c * cellSize + cellSize / 2;
+                let cy = m.r * cellSize + cellSize / 2;
+
+                ctx.save();
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.45)';
+                ctx.strokeStyle = 'rgba(147, 197, 253, 0.8)';
+                ctx.lineWidth = 2;
+                
+                ctx.beginPath();
+                ctx.arc(cx, cy, cellSize * 0.28, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
             });
 
-            ctx.strokeStyle = '#ffff00';
-            ctx.lineWidth = 4;
-            ctx.strokeRect(selectedUnit.renderX + 2, selectedUnit.renderY + 2, cellSize - 4, cellSize - 4);
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(selectedUnit.renderX + 3, selectedUnit.renderY + 3, cellSize - 6, cellSize - 6);
         }
 
         if ((selectedUnit.name || '').includes('Ship') || (selectedUnit.name || '').includes('Artillery')) {
@@ -372,14 +392,9 @@ function update() {
         }
     }
 
-    if (targetTile && !rangeMode) {
-        ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(targetTile.c * cellSize + 2, targetTile.r * cellSize + 2, cellSize - 4, cellSize - 4);
-    }
-
-    // Render units 30% larger (cellSize * 1.3) with rotational facing heading applied
     units.forEach(u => {
+        if (u.invisible) return;
+
         if (u.loaded && u.loaded()) {
             let unitSize = cellSize * 1.3;
             if (typeof u.facing === 'undefined') u.facing = 0;
@@ -387,8 +402,44 @@ function update() {
         }
     });
 
+    if (typeof unitDestructionEffects !== 'undefined' && unitDestructionEffects.length > 0) {
+        ctx.save();
+        let now = performance.now();
+
+        for (let i = unitDestructionEffects.length - 1; i >= 0; i--) {
+            let fx = unitDestructionEffects[i];
+            let elapsed = now - fx.startTime;
+
+            if (elapsed < fx.duration) {
+                let progress = elapsed / fx.duration;
+                let alpha = 1 - progress;
+
+                ctx.beginPath();
+                ctx.arc(fx.x, fx.y, progress * (cellSize * 0.9), 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(245, 158, 11, ${alpha * 0.8})`;
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                fx.particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = alpha;
+                    ctx.beginPath();
+                    ctx.arc(fx.x + p.x, fx.y + p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                ctx.globalAlpha = 1.0;
+            } else {
+                unitDestructionEffects.splice(i, 1);
+            }
+        }
+        ctx.restore();
+    }
+
     requestAnimationFrame(update);
 }
 
-SystemLog.info('Unit movement controller fully synchronized with combat mechanics and gold core capture animations.');
+SystemLog.info('Unit movement controller updated with sound triggers, modern indicators, and instant tap-to-move.');
 update();
