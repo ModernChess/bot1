@@ -12,6 +12,9 @@ let artilleryDuelState = {
     attackerCard: null // 'green' or 'red'
 };
 
+// Global array to track active unit destruction particle animations
+let unitDestructionEffects = [];
+
 function getSuperunitsForTeam(teamName, allUnits) {
     let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName);
     let combatUnits = teamUnits.filter(u => !isSpecialUnit(u) && getUnitPower(u) !== Infinity);
@@ -104,6 +107,42 @@ function isUnitLockedInStalemate(unit, allUnits) {
         }
     }
     return false;
+}
+
+function commitUnitDestruction(allUnits, unitsToDestroy) {
+    unitsToDestroy.forEach(unit => {
+        let cx = unit.gridX * cellSize + cellSize / 2;
+        let cy = unit.gridY * cellSize + cellSize / 2;
+        
+        unitDestructionEffects.push({
+            x: cx,
+            y: cy,
+            startTime: performance.now(),
+            duration: 600,
+            particles: Array.from({ length: 14 }, () => {
+                let angle = Math.random() * Math.PI * 2;
+                let speed = 1 + Math.random() * 4;
+                return {
+                    x: 0,
+                    y: 0,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: 2 + Math.random() * 3,
+                    color: Math.random() > 0.4 ? '#f59e0b' : '#ef4444'
+                };
+            })
+        });
+
+        if (typeof window.triggerDestroySound === 'function') {
+            window.triggerDestroySound(unit.name);
+        }
+    });
+
+    for (let i = allUnits.length - 1; i >= 0; i--) {
+        if (unitsToDestroy.has(allUnits[i])) {
+            allUnits.splice(i, 1);
+        }
+    }
 }
 
 function resolveUnitInteractions(allUnits) {
