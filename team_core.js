@@ -1,10 +1,12 @@
 // =========================================================================
-// TEAM CORE, ECONOMY, BASES, & WIN CONDITIONS CONTROLLER
+// TEAM CORE, ECONOMY, BASES, & WIN CONDITIONS CONTROLLER (LOGIC ONLY)
 // =========================================================================
 
 let currentTurn = 'blue';
-let blueCoins = 0;
-let redCoins = 0;
+let humanMatchXp = 0;   // Match XP tracker (resets to 0 each game)
+let humanXpMax = 100;   // XP required for next rank/level up inside match
+let humanLevel = 1;     // Human player level rank inside match
+
 let destroyedUnitsQueue = [];
 let flagAnimations = {};
 let gameOver = false;
@@ -75,6 +77,54 @@ function areUnitsAdjacent(u1, u2) {
     return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
 }
 
+function getSuperunitsForTeam(teamName, allUnits) {
+    let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName);
+    let superunits = [];
+    let visited = new Set();
+
+    teamUnits.forEach(u => {
+        if (visited.has(u)) return;
+
+        let cluster = [u];
+        visited.add(u);
+
+        let queue = [u];
+        while (queue.length > 0) {
+            let current = queue.shift();
+            teamUnits.forEach(other => {
+                if (!visited.has(other) && areUnitsAdjacent(current, other)) {
+                    visited.add(other);
+                    cluster.push(other);
+                    queue.push(other);
+                }
+            });
+        }
+
+        let powerSum = cluster.reduce((sum, unit) => sum + getUnitPower(unit), 0);
+        let hasInfinite = cluster.some(unit => getUnitPower(unit) === Infinity);
+
+        superunits.push({
+            units: cluster,
+            power: hasInfinite ? Infinity : powerSum,
+            isSpecialSuperunit: cluster.some(unit => isSpecialUnit(unit))
+        });
+    });
+
+    return superunits;
+}
+
+window.rewardHumanCapture = function() {
+    humanMatchXp += 35;
+    TeamLog.success(`Human captured a base/core! +35 Match XP Gained.`);
+
+    if (humanMatchXp >= humanXpMax) {
+        humanMatchXp -= humanXpMax;
+        humanLevel += 1;
+        humanXpMax = Math.floor(humanXpMax * 1.3);
+        TeamLog.success(`HUMAN PLAYER LEVEL UP IN MATCH! Reached Level ${humanLevel}!`);
+    }
+};
+
 function checkWinConditions(allUnits) {
     if (gameOver) return;
 
@@ -87,12 +137,14 @@ function checkWinConditions(allUnits) {
         gameOver = true;
         winnerMessage = 'BLUE TEAM WINS BY ANNIHILATION!';
         TeamLog.success(winnerMessage);
+        triggerPostGameReload();
         return;
     }
     if (blueLandUnits.length === 0 || blueTotal.length === 0) {
         gameOver = true;
         winnerMessage = 'RED TEAM WINS BY ANNIHILATION!';
         TeamLog.success(winnerMessage);
+        triggerPostGameReload();
         return;
     }
 
@@ -102,9 +154,107 @@ function checkWinConditions(allUnits) {
                 gameOver = true;
                 winnerMessage = `${core.owner.toUpperCase()} TEAM WINS BY CAPTURING ENEMY BASE!`;
                 TeamLog.success(winnerMessage);
+                triggerPostGameReload();
             }
         }
     });
+
+    if (gameOver) return;
+
+    let blueUnits = allUnits.filter(u => getTeamFromUnit(u) === 'blue');
+    let redUnits = allUnits.filter(u => getTeamFromUnit(u) === 'red');
+
+    let isTeamCompletelyStalmated = (teamUnits) => {
+        if (teamUnits.length === 0) return false;
+        return teamUnits.every(u => {
+            if (typeof isUnitLockedInStalemate === 'function' && isUnitLockedInStalemate(u, allUnits)) return true;
+            let moves = typeof getLegalMoves === 'function' ? getLegalMoves(u) : [];
+            return !moves || moves.length === 0;
+        });
+    };
+
+    let blueStalmated = isTeamCompletelyStalmated(blueUnits);
+    let redStalmated = isTeamCompletelyStalmated(redUnits);
+
+    if (blueStalmated || redStalmated) {
+        gameOver = true;
+        if (blueUnits.length > redUnits.length) {
+            winnerMessage = 'BLUE TEAM WINS BY GREATER NUMBER OF UNITS (RED STALEMATED)!';
+        } else if (redUnits.length > blueUnits.length) {
+            winnerMessage = 'RED TEAM WINS BY GREATER NUMBER OF UNITS (BLUE STALEMATED)!';
+        } else {
+            winnerMessage = 'STALEMATE DRAW! Equal units remaining.';
+        }
+        TeamLog.success(winnerMessage);
+        triggerPostGameReload();
+    }
+}
+
+function triggerPostGameReload() {
+    console.log("[team_core] Game over reached. Processing account XP persistence & resetting match state...");
+    
+    let isHumanWinner = winnerMessage.includes('BLUE TEAM WINS') || winnerMessage.includes('BLUE TEAM WINS BY CAPTURING ENEMY BASE');
+    
+    if (isHumanWinner && typeof cachedUser !== 'undefined') {
+        let earnedXpReward = humanMatchXp + 15;
+        
+        if (typeof totalUserXp !== 'undefined') {
+            totalUserXp += earnedXpReward;
+            localStorage.setItem(`chess_campaign_xp_${cachedUser}`, totalUserXp);
+        }
+
+        // FIXED: Level increment removed here to prevent double-incrementing / level skipping. 
+        // game.js handles currentCampaignLevel progression exclusively now.
+        /*
+        if (typeof currentCampaignLevel !== 'undefined' && currentCampaignLevel < 15) {
+            currentCampaignLevel++;
+            localStorage.setItem(`chess_campaign_level_${cachedUser}`, currentCampaignLevel);
+        }
+        */
+
+        if (typeof getPlayerRank === 'function') {
+            let rankData = getPlayerRank(totalUserXp);
+            let rankVal = document.getElementById('hudRankVal');
+            let lvlVal = document.getElementById('hudLevelVal');
+            let xpVal = document.getElementById('hudXpVal');
+            
+            if (rankVal) { rankVal.innerText = rankData.title; rankVal.style.color = rankData.color; }
+            if (lvlVal) lvlVal.innerText = currentCampaignLevel;
+            if (xpVal) xpVal.innerText = totalUserXp;
+        }
+
+        if (typeof renderAccountModalContent === 'function') {
+            renderAccountModalContent();
+        }
+
+        console.log(`[SUCCESS][team_core] Saved ${earnedXpReward} XP to account ${cachedUser}! New Total XP: ${totalUserXp}`);
+    }
+
+    humanMatchXp = 0;
+    humanLevel = 1;
+    humanXpMax = 100;
+
+    setTimeout(() => {
+        gameOver = false;
+        winnerMessage = '';
+        currentTurn = 'blue';
+        
+        goldCores.forEach(core => {
+            if (core.isBase && core.teamBase) {
+                core.owner = core.teamBase;
+            } else {
+                core.owner = null;
+            }
+        });
+        flagAnimations = {};
+
+        if (typeof currentCampaignLevel !== 'undefined' && typeof initLevelUnits === 'function') {
+            initLevelUnits(currentCampaignLevel);
+        } else if (typeof resetGameBoards === 'function') {
+            resetGameBoards();
+        }
+        console.log("[team_core] Board and capture tiles successfully reloaded for the next match!");
+    }, 3500);
 }
 
 function commitUnitDestruction(unitsArray, unitsToDestroy) {
@@ -123,7 +273,6 @@ function commitUnitDestruction(unitsArray, unitsToDestroy) {
     });
 }
 
-// Shop integration functions for purchasing units using gold coins
 function toggleShop() {
     let modal = document.getElementById('shop-modal');
     if (!modal) return;
@@ -131,235 +280,7 @@ function toggleShop() {
 }
 
 function buyUnit(unitType) {
-    if (gameOver) return;
-
-    let activeTeam = currentTurn;
-    let cost = 0;
-    let unitName = '';
-    let unitRange = 2;
-    let unitCategory = 'land';
-    let imgRef, loadRef;
-
-    if (activeTeam === 'blue') {
-        if (unitType === 'infantry') { cost = 1; unitName = 'Infantry'; unitRange = 2; imgRef = blueInfantryImg; loadRef = () => blueInfantryLoaded; }
-        else if (unitType === 'tank') { cost = 1; unitName = 'Tank'; unitRange = 3; imgRef = blueTankImg; loadRef = () => blueTankLoaded; }
-        else if (unitType === 'artillery') { cost = 2; unitName = 'Artillery'; unitRange = 2; imgRef = blueArtilleryImg; loadRef = () => blueArtilleryLoaded; }
-        else if (unitType === 'ship') { cost = 2; unitName = 'Ship'; unitRange = 2; unitCategory = 'water'; imgRef = blueShipImg; loadRef = () => blueShipLoaded; }
-    } else {
-        if (unitType === 'infantry') { cost = 1; unitName = 'Infantry'; unitRange = 2; imgRef = redInfantryImg; loadRef = () => redInfantryLoaded; }
-        else if (unitType === 'tank') { cost = 1; unitName = 'Tank'; unitRange = 3; imgRef = redTankImg; loadRef = () => redTankLoaded; }
-        else if (unitType === 'artillery') { cost = 2; unitName = 'Artillery'; unitRange = 2; imgRef = redArtilleryImg; loadRef = () => redArtilleryLoaded; }
-        else if (unitType === 'ship') { cost = 2; unitName = 'Ship'; unitRange = 2; unitCategory = 'water'; imgRef = redShipImg; loadRef = () => redShipLoaded; }
-    }
-
-    let currentCoins = activeTeam === 'blue' ? blueCoins : redCoins;
-    if (currentCoins < cost) {
-        TeamLog.warn(`Not enough gold to buy ${unitType}! Required: ${cost}, Available: ${currentCoins}`);
-        alert(`Not enough gold! You need ${cost} gold coins.`);
-        return;
-    }
-
-    if (activeTeam === 'blue') blueCoins -= cost;
-    else redCoins -= cost;
-
-    let spawnPos = null;
-    if (unitCategory === 'water') {
-        spawnPos = getPortSquare(activeTeam);
-    } else {
-        let baseSquares = getBaseSquares(activeTeam);
-        let availableBase = baseSquares.filter(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
-        if (availableBase.length > 0) {
-            spawnPos = availableBase[0];
-        } else {
-            spawnPos = baseSquares[0] || {c: 0, r: 0};
-        }
-    }
-
-    if (unitType === 'infantry') {
-        for (let i = 0; i < 2; i++) {
-            let pos = i === 0 ? spawnPos : (getBaseSquares(activeTeam).find(b => !units.some(u => u.gridX === b.c && u.gridY === b.r)) || spawnPos);
-            units.push({
-                name: unitName,
-                type: unitCategory,
-                range: unitRange,
-                gridX: pos.c,
-                gridY: pos.r,
-                x: pos.c * cellSize,
-                y: pos.r * cellSize,
-                img: imgRef,
-                loaded: loadRef,
-                team: activeTeam
-            });
-        }
-        TeamLog.success(`${activeTeam.toUpperCase()} successfully recruited 2x Infantry via shop!`);
-    } else {
-        units.push({
-            name: unitName,
-            type: unitCategory,
-            range: unitRange,
-            gridX: spawnPos.c,
-            gridY: spawnPos.r,
-            x: spawnPos.c * cellSize,
-            y: spawnPos.r * cellSize,
-            img: imgRef,
-            loaded: loadRef,
-            team: activeTeam
-        });
-        TeamLog.success(`${activeTeam.toUpperCase()} successfully recruited 1x ${unitName} via shop!`);
-    }
-
-    toggleShop();
+    TeamLog.info("Shop interaction disabled: Coins have been removed from the game.");
 }
 
-function drawTeamUIAndFlags() {
-    let now = performance.now();
-
-    ctx.fillStyle = 'rgba(26, 26, 26, 0.85)';
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 2;
-    ctx.fillRect(12, 12, 160, 60);
-    ctx.strokeRect(12, 12, 160, 60);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`Turn: ${currentTurn.toUpperCase()}`, 24, 20);
-    ctx.fillStyle = '#3498db';
-    ctx.fillText(`Blue Coins: ${blueCoins}`, 24, 38);
-    ctx.fillStyle = '#e74c3c';
-    ctx.fillText(`Red Coins: ${redCoins}`, 24, 54);
-
-    if (gameOver) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#f1c40f';
-        ctx.font = 'bold 28px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(winnerMessage, canvas.width / 2, canvas.height / 2);
-        return;
-    }
-
-    // Render Red Bot Path Visualization Markers
-    if (window.activeRedBotPath && window.activeRedBotPath.length > 0) {
-        window.activeRedBotPath.forEach((tile, index) => {
-            let cx = tile.c * cellSize + cellSize / 2;
-            let cy = tile.r * cellSize + cellSize / 2;
-
-            ctx.fillStyle = '#ff3333';
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1.5;
-
-            ctx.beginPath();
-            ctx.arc(cx, cy, cellSize * 0.22, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 10px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(index + 1, cx, cy);
-        });
-    }
-
-    goldCores.forEach(core => {
-        let cx = core.c * cellSize + cellSize / 2;
-        let cy = core.r * cellSize + cellSize / 2;
-
-        if (core.owner) {
-            ctx.fillStyle = core.owner === 'blue' ? '#3498db' : '#e74c3c';
-            ctx.beginPath();
-            ctx.arc(cx, cy, cellSize * 0.25, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#ffffff';
-            ctx.stroke();
-        }
-
-        if (flagAnimations[core.id]) {
-            let elapsed = now - flagAnimations[core.id];
-            let duration = 500;
-            if (elapsed < duration) {
-                let progress = elapsed / duration;
-                let dropOffset = (1 - Math.cos(progress * Math.PI * 0.5)) * (cellSize * 1.5);
-                let renderY = cy - (cellSize * 1.5) + dropOffset;
-
-                ctx.fillStyle = core.owner === 'blue' ? '#2980b9' : '#c0392b';
-                ctx.fillRect(cx - 4, renderY, 8, cellSize * 0.8);
-                ctx.fillStyle = '#f1c40f';
-                ctx.beginPath();
-                ctx.moveTo(cx + 4, renderY);
-                ctx.lineTo(cx + 16, renderY + 6);
-                ctx.lineTo(cx + 4, renderY + 12);
-                ctx.fill();
-            } else {
-                delete flagAnimations[core.id];
-            }
-        }
-    });
-
-    let mapCenterX = canvas.width / 2;
-    let mapCenterY = canvas.height / 2;
-
-    ['blue', 'red'].forEach(teamName => {
-        let suList = getSuperunitsForTeam(teamName, units);
-        suList.forEach(su => {
-            if (su.units.length <= 1 && su.power !== Infinity && !su.isSpecialSuperunit) return;
-
-            let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
-            let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
-
-            if (su.isSpecialSuperunit && su.core) {
-                avgX = (avgX + su.core.c * cellSize) / 2;
-                avgY = (avgY + su.core.r * cellSize) / 2;
-            }
-
-            let unitCenterX = avgX + cellSize / 2;
-            let unitCenterY = avgY + cellSize / 2;
-
-            let dirX = mapCenterX - unitCenterX;
-            let dirY = mapCenterY - unitCenterY;
-            let length = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
-            
-            let significantDistance = cellSize * 1.8;
-            let offsetX = (dirX / length) * significantDistance;
-            let offsetY = (dirY / length) * significantDistance;
-
-            let badgeX = unitCenterX + offsetX - 22;
-            let badgeY = unitCenterY + offsetY - 12;
-
-            ctx.fillStyle = '#cc0000';
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.5;
-            let powerDisplay = su.power === Infinity ? '∞' : su.power;
-            
-            ctx.beginPath();
-            ctx.fillRect(badgeX, badgeY, 44, 24);
-            ctx.strokeRect(badgeX, badgeY, 44, 24);
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 13px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            let lockedText = su.units.some(u => isUnitLockedInStalemate(u, units)) ? ' 🔒' : '';
-            ctx.fillText(`${powerDisplay}${lockedText}`, badgeX + 22, badgeY + 12);
-        });
-    });
-
-    destroyedUnitsQueue = destroyedUnitsQueue.filter(item => {
-        let elapsed = now - item.startTime;
-        let progress = elapsed / item.duration;
-        if (progress >= 1.0) return false;
-
-        let u = item.unit;
-        let rx = u.gridX * cellSize;
-        let ry = u.gridY * cellSize;
-
-        ctx.fillStyle = `rgba(255, 50, 50, ${1 - progress})`;
-        ctx.fillRect(rx + 2, ry + 2, cellSize - 4, cellSize - 4);
-        return true;
-    });
-}
+TeamLog.success("Team core logic controller successfully decoupled.");
