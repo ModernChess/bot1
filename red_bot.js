@@ -1,5 +1,6 @@
 // =========================================================================
-// RED TEAM PATHFINDING BOT CONTROLLER (Live Threat Priority & Aggressive Hunt)
+// RED TEAM PATHFINDING BOT CONTROLLER (red_bot.js)
+// Upgraded with Non-Stalemated Base Defense Filtering
 // =========================================================================
 
 function buildSuperpowerCache(allUnits) {
@@ -196,7 +197,7 @@ function getAdjacentAttackTile(unit, targetUnit, unitPowerMap, enemyUnits) {
     let shortestPathLength = Infinity;
 
     validAdj.forEach(adj => {
-        let path = findPathToTarget(unit, adj.c, adj.r, unitPowerMap, enemyUnits, false);
+        let path = findPathToTarget(unit, adj.c, adj.r, unitPowerMap, enemyUnits, true);
         if (path && path.length < shortestPathLength) {
             shortestPathLength = path.length;
             bestTile = adj;
@@ -210,212 +211,274 @@ function executeRedBotTurn() {
     if (typeof gameOver !== 'undefined' && gameOver) return;
     if (typeof currentTurn !== 'undefined' && currentTurn !== 'red') return;
 
-    if (typeof SystemLog !== 'undefined' && SystemLog.info) {
-        SystemLog.info("[red_bot] Evaluating live threats, aggressive hunts, and goals...");
-    } else {
-        console.log("[red_bot] Evaluating live threats, aggressive hunts, and goals...");
+    let redUnits = units.filter(u => getTeamFromUnit(u) === 'red');
+    let blueUnits = units.filter(u => getTeamFromUnit(u) === 'blue');
+    let { unitPowerMap } = buildSuperpowerCache(units);
+
+    if (typeof currentCampaignLevel !== 'undefined' && currentCampaignLevel <= 5) {
+        if ((currentCampaignLevel === 1 || currentCampaignLevel === 2) && blueUnits.length > 0) {
+            let blueUnit = blueUnits[0];
+            let redBase = { c: 11, r: 0 };
+            if (typeof findPathToTarget === 'function') {
+                window.activeRedBotPath = findPathToTarget(blueUnit, redBase.c, redBase.r, unitPowerMap, [], true) || [];
+            }
+        }
+
+        if (currentCampaignLevel >= 4 && redUnits.length >= 2 && blueUnits.length > 0) {
+            let staticRedUnit = redUnits[0];
+            let activeRedUnit = redUnits[1];
+
+            let isStalmated = typeof isUnitLockedInStalemate === 'function' ? isUnitLockedInStalemate(staticRedUnit, units) : false;
+            if (isStalmated) {
+                if (typeof findPathToTarget === 'function') {
+                    window.activeRedBotPath = findPathToTarget(blueUnits[0], activeRedUnit.gridX, activeRedUnit.gridY, unitPowerMap, [], true) || [];
+                }
+            }
+        }
+
+        setTimeout(() => {
+            currentTurn = 'blue';
+        }, 500);
+        return;
     }
 
-    let redUnits = units.filter(u => getTeamFromUnit(u) === 'red');
-    
+    function getUnitMaxRange(u) {
+        if (u.movementRange) return u.movementRange;
+        if (u.maxRange) return u.maxRange;
+        return isTank(u) ? 3 : 2; 
+    }
+
     let movableUnits = redUnits.filter(u => {
-        if (typeof isUnitLockedInStalemate === 'function' && isUnitLockedInStalemate(u, units)) {
-            return false;
-        }
         let moves = getLegalMoves(u);
-        return moves && moves.length > 0;
+        return moves && moves.length > 0 && !(typeof isUnitLockedInStalemate === 'function' && isUnitLockedInStalemate(u, units));
     });
 
     if (movableUnits.length === 0) {
-        console.log("[red_bot] No red units are movable or unlocked. Ending turn.");
         currentTurn = 'blue';
         return;
     }
 
-    let blueUnits = units.filter(u => getTeamFromUnit(u) === 'blue');
-    let { unitPowerMap } = buildSuperpowerCache(units);
-
     // =========================================================================
-    // STEP 1: EMERGENCY ESCAPE (Handling Cornered & Stressed Units)
+    // STEP 1: ABSOLUTE BASE DEFENSE EMERGENCY OVERRIDE (Greater than Stalemate)
     // =========================================================================
-    let unitEscapePlans = [];
+    let redBaseSquares = typeof getBaseSquares === 'function' ? getBaseSquares('red') : [{c: 11, r: 0}];
+    let baseThreatDetected = false;
+    let targetIntruder = null;
 
-    movableUnits.forEach(unit => {
-        let currentHazard = getPositionHazardLevel({ c: unit.gridX, r: unit.gridY }, unit, unitPowerMap, blueUnits);
-        
-        if (currentHazard > 0) {
-            let moves = getLegalMoves(unit);
-            if (moves && moves.length > 0) {
-                let unoccupiedMoves = moves.filter(m => !units.some(u => u.gridX === m.c && u.gridY === m.r));
-
-                let bestEscapeMove = null;
-                let lowestMoveHazard = Infinity;
-
-                unoccupiedMoves.forEach(move => {
-                    let moveHazard = getPositionHazardLevel(move, unit, unitPowerMap, blueUnits);
-                    if (moveHazard < lowestMoveHazard) {
-                        lowestMoveHazard = moveHazard;
-                        bestEscapeMove = move;
-                    }
-                });
-
-                if (bestEscapeMove) {
-                    unitEscapePlans.push({
-                        unit,
-                        move: bestEscapeMove,
-                        hazardReduction: currentHazard - lowestMoveHazard,
-                        newHazard: lowestMoveHazard,
-                        description: `EMERGENCY ESCAPE (Hazard: ${currentHazard} -> ${lowestMoveHazard})`
-                    });
-                }
+    for (let enemy of blueUnits) {
+        for (let baseTile of redBaseSquares) {
+            let distToBase = Math.max(Math.abs(enemy.gridX - baseTile.c), Math.abs(enemy.gridY - baseTile.r));
+            if (distToBase <= 5) {
+                baseThreatDetected = true;
+                targetIntruder = enemy;
+                break;
             }
         }
-    });
-
-    if (unitEscapePlans.length > 0) {
-        unitEscapePlans.sort((a, b) => b.hazardReduction - a.hazardReduction);
-        let priorityEscape = unitEscapePlans[0];
-
-        if (!units.some(u => u.gridX === priorityEscape.move.c && u.gridY === priorityEscape.move.r)) {
-            if (typeof tryMoveUnit === 'function') {
-                tryMoveUnit(priorityEscape.unit, priorityEscape.move.c, priorityEscape.move.r);
-                console.warn(`[red_bot] STRESS ESCAPE: ${priorityEscape.unit.name} moved to (${priorityEscape.move.c}, ${priorityEscape.move.r})`);
-            }
-        }
-
-        if (typeof checkWinConditions === 'function') {
-            checkWinConditions(units);
-        }
-
-        setTimeout(() => {
-            currentTurn = 'blue';
-        }, 800);
-        return;
+        if (baseThreatDetected) break;
     }
 
-    // =========================================================================
-    // STEP 2: STANDARD GOAL ASSIGNMENT (Aggressive Hunt & Cores, Tank Weighting)
-    // =========================================================================
-    let safeCores = [];
-    if (typeof goldCores !== 'undefined' && goldCores.length > 0) {
-        safeCores = goldCores.filter(core => {
-            if (core.owner === 'red') return false;
-            let squares = [{ c: core.c, r: core.r }];
-            if (core.captureZones) squares = squares.concat(core.captureZones);
-            
-            let defended = squares.some(sq => {
-                if (units.some(u => u.gridX === sq.c && u.gridY === sq.r)) return true;
-                return blueUnits.some(u => {
-                    let dist = Math.max(Math.abs(sq.c - u.gridX), Math.abs(sq.r - u.gridY));
-                    return dist <= 2;
-                });
+    if (baseThreatDetected && targetIntruder) {
+        console.warn(`[red_bot] 🚨 ABSOLUTE EMERGENCY: Intruder ${targetIntruder.name} within 5 tiles of Red Base! Alerting non-stalemated units to slam into target.`);
+
+        // FIXED: Explicitly filter out any stalemated units so they aren't chosen for emergency defense
+        let emergencyDefenders = redUnits.filter(u => {
+            let isStalemated = typeof isUnitLockedInStalemate === 'function' && isUnitLockedInStalemate(u, units);
+            if (isStalemated) return false;
+            let moves = getLegalMoves(u);
+            return moves && moves.length > 0;
+        });
+
+        if (emergencyDefenders.length > 0) {
+            emergencyDefenders.sort((a, b) => {
+                let distA = Math.max(Math.abs(a.gridX - targetIntruder.gridX), Math.abs(a.gridY - targetIntruder.gridY));
+                let distB = Math.max(Math.abs(b.gridX - targetIntruder.gridX), Math.abs(b.gridY - targetIntruder.gridY));
+                return distA - distB;
             });
-            
-            return !defended;
-        });
+
+            let defendingUnit = emergencyDefenders[0];
+            let attackTile = getAdjacentAttackTile(defendingUnit, targetIntruder, unitPowerMap, blueUnits);
+            let targetMove = null;
+
+            if (attackTile) {
+                let path = findPathToTarget(defendingUnit, attackTile.c, attackTile.r, unitPowerMap, blueUnits, true);
+                if (path && path.length > 0) {
+                    let maxRange = getUnitMaxRange(defendingUnit);
+                    let stepsToTake = Math.min(path.length, maxRange);
+                    targetMove = path[stepsToTake - 1];
+                }
+            }
+
+            if (!targetMove) {
+                let directPath = findPathToTarget(defendingUnit, targetIntruder.gridX, targetIntruder.gridY, unitPowerMap, blueUnits, true);
+                if (directPath && directPath.length > 0) {
+                    let maxRange = getUnitMaxRange(defendingUnit);
+                    let stepsToTake = Math.min(directPath.length, maxRange);
+                    targetMove = directPath[stepsToTake - 1];
+                }
+            }
+
+            if (targetMove && !units.some(u => u.gridX === targetMove.c && u.gridY === targetMove.r)) {
+                if (typeof tryMoveUnit === 'function') {
+                    tryMoveUnit(defendingUnit, targetMove.c, targetMove.r);
+                    console.log(`[red_bot] 💥 EMERGENCY STRIKE: Non-stalemated unit ${defendingUnit.name} slammed toward base intruder at (${targetMove.c}, ${targetMove.r}).`);
+                    if (typeof checkWinConditions === 'function') checkWinConditions(units);
+                    setTimeout(() => { currentTurn = 'blue'; }, 800);
+                    return;
+                }
+            }
+        }
     }
 
-    let possibleChoices = [];
+    // =========================================================================
+    // STEP 2: TRUE STALEMATE RESCUE PROTOCOL
+    // =========================================================================
+    let stalematedTeammates = redUnits.filter(u => {
+        return typeof isUnitLockedInStalemate === 'function' && isUnitLockedInStalemate(u, units);
+    });
 
-    movableUnits.forEach(unit => {
-        if (getPositionHazardLevel({ c: unit.gridX, r: unit.gridY }, unit, unitPowerMap, blueUnits) > 0) {
-            return; 
-        }
+    if (stalematedTeammates.length > 0) {
+        let trappedUnit = stalematedTeammates[0];
+        let availableRescuers = redUnits.filter(u => {
+            if (u === trappedUnit) return false;
+            if (typeof isUnitLockedInStalemate === 'function' && isUnitLockedInStalemate(u, units)) return false;
+            let moves = getLegalMoves(u);
+            return moves && moves.length > 0;
+        });
 
-        let myEffectivePower = getCachedEffectivePower(unit, unitPowerMap);
+        if (availableRescuers.length > 0) {
+            availableRescuers.sort((a, b) => {
+                let distA = Math.max(Math.abs(a.gridX - trappedUnit.gridX), Math.abs(a.gridY - trappedUnit.gridY));
+                let distB = Math.max(Math.abs(b.gridX - trappedUnit.gridX), Math.abs(b.gridY - trappedUnit.gridY));
+                return distA - distB;
+            });
 
-        // 1. Aggressive Hunt: Hunt down weaker enemy units (e.g. Blue Infantry)
-        blueUnits.forEach(enemy => {
-            let enemyEffectivePower = getCachedEffectivePower(enemy, unitPowerMap);
-            if (myEffectivePower > enemyEffectivePower) {
-                let attackTile = getAdjacentAttackTile(unit, enemy, unitPowerMap, blueUnits);
-                if (attackTile) {
-                    let path = findPathToTarget(unit, attackTile.c, attackTile.r, unitPowerMap, blueUnits, false);
-                    if (path && path.length > 0) {
-                        let score = path.length;
-                        if (isTank(unit)) score *= 0.8; 
-                        possibleChoices.push({ 
-                            unit, 
-                            path, 
-                            description: `Aggressive Hunt (${enemy.name})`, 
-                            targetCoreId: null, 
-                            score 
-                        });
+            let closestRescuer = availableRescuers[0];
+            let candidateTiles = [
+                {c: trappedUnit.gridX, r: trappedUnit.gridY - 1},
+                {c: trappedUnit.gridX, r: trappedUnit.gridY + 1},
+                {c: trappedUnit.gridX - 1, r: trappedUnit.gridY},
+                {c: trappedUnit.gridX + 1, r: trappedUnit.gridY},
+                {c: trappedUnit.gridX - 1, r: trappedUnit.gridY - 1},
+                {c: trappedUnit.gridX + 1, r: trappedUnit.gridY - 1},
+                {c: trappedUnit.gridX - 1, r: trappedUnit.gridY + 1},
+                {c: trappedUnit.gridX + 1, r: trappedUnit.gridY + 1}
+            ].filter(pos => {
+                if (pos.c < 0 || pos.c >= cols || pos.r < 0 || pos.r >= rows) return false;
+                let terrain = getTerrain(pos.c, pos.r);
+                let isWater = isWaterTerrain(terrain);
+                if (closestRescuer.type === 'land' && isWater) return false;
+                if (closestRescuer.type === 'water' && !isWater) return false;
+                return !units.some(u => u.gridX === pos.c && u.gridY === pos.r);
+            });
+
+            if (candidateTiles.length > 0) {
+                candidateTiles.sort((a, b) => {
+                    let dA = Math.max(Math.abs(a.c - closestRescuer.gridX), Math.abs(a.r - closestRescuer.gridY));
+                    let dB = Math.max(Math.abs(b.c - closestRescuer.gridX), Math.abs(b.r - closestRescuer.gridY));
+                    return dA - dB;
+                });
+
+                let bestTargetTile = candidateTiles[0];
+                let rescuePath = findPathToTarget(closestRescuer, bestTargetTile.c, bestTargetTile.r, unitPowerMap, blueUnits, true);
+
+                if (rescuePath && rescuePath.length > 0) {
+                    let maxRange = getUnitMaxRange(closestRescuer);
+                    let stepsToTake = Math.min(rescuePath.length, maxRange);
+                    let destination = rescuePath[stepsToTake - 1];
+
+                    if (!units.some(u => u.gridX === destination.c && u.gridY === destination.r)) {
+                        if (typeof tryMoveUnit === 'function') {
+                            tryMoveUnit(closestRescuer, destination.c, destination.r);
+                            if (typeof checkWinConditions === 'function') checkWinConditions(units);
+                            setTimeout(() => { currentTurn = 'blue'; }, 800);
+                            return;
+                        }
                     }
                 }
             }
-        });
-
-        // 2. Persistent Gold Core
-        if (unit.targetCoreId) {
-            let existingCore = safeCores.find(c => c.id === unit.targetCoreId);
-            if (existingCore) {
-                let path = findPathToTarget(unit, existingCore.c, existingCore.r, unitPowerMap, blueUnits, false);
-                if (path && path.length > 0) {
-                    let score = path.length;
-                    if (isTank(unit)) score *= 0.85; 
-                    possibleChoices.push({ unit, path, description: "Persistent Gold Core", targetCoreId: existingCore.id, score });
-                }
-            } else {
-                unit.targetCoreId = null;
-            }
         }
-
-        // 3. Closest Gold Core
-        safeCores.forEach(core => {
-            let path = findPathToTarget(unit, core.c, core.r, unitPowerMap, blueUnits, false);
-            if (path && path.length > 0) {
-                let score = path.length;
-                if (isTank(unit)) score *= 0.85; 
-                possibleChoices.push({ unit, path, description: "Closest Gold Core", targetCoreId: core.id, score });
-            }
-        });
-    });
-
-    if (possibleChoices.length > 0) {
-        possibleChoices.sort((a, b) => a.score - b.score);
-        let bestChoice = possibleChoices[0];
-
-        let chosenUnit = bestChoice.unit;
-        chosenUnit.targetCoreId = bestChoice.targetCoreId;
-
-        let maxStep = chosenUnit.speed || chosenUnit.range || 2;
-        let stepIndex = Math.min(maxStep - 1, bestChoice.path.length - 1);
-        let nextStep = bestChoice.path[stepIndex];
-
-        if (!units.some(u => u.gridX === nextStep.c && u.gridY === nextStep.r)) {
-            if (typeof tryMoveUnit === 'function') {
-                tryMoveUnit(chosenUnit, nextStep.c, nextStep.r);
-                console.log(`[red_bot] ${chosenUnit.name} advanced towards ${bestChoice.description} at (${nextStep.c}, ${nextStep.r})`);
-            }
-        }
-
-        if (typeof checkWinConditions === 'function') {
-            checkWinConditions(units);
-        }
-
-        setTimeout(() => {
-            currentTurn = 'blue';
-        }, 800);
-        return;
     }
 
     // =========================================================================
-    // STEP 3: ULTIMATE FALLBACK
+    // STEP 3: OFFENSIVE BASE CAPTURE (Only executed if base is safe)
     // =========================================================================
-    let fallbackUnit = movableUnits.find(u => getPositionHazardLevel({ c: u.gridX, r: u.gridY }, u, unitPowerMap, blueUnits) === 0);
-    if (!fallbackUnit && movableUnits.length > 0) fallbackUnit = movableUnits[0];
+    let blueBaseSquares = typeof getBaseSquares === 'function' ? getBaseSquares('blue') : [{c: 0, r: 11}];
+    let openBaseTarget = blueBaseSquares.find(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
 
-    if (fallbackUnit) {
-        let moves = getLegalMoves(fallbackUnit);
-        let unoccupiedMoves = moves ? moves.filter(m => !units.some(u => u.gridX === m.c && u.gridY === m.r)) : [];
-        
-        if (unoccupiedMoves.length > 0) {
-            let randomMove = unoccupiedMoves[Math.floor(Math.random() * unoccupiedMoves.length)];
-            if (typeof tryMoveUnit === 'function') {
-                tryMoveUnit(fallbackUnit, randomMove.c, randomMove.r);
-                console.log(`[red_bot] CORNERED FALLBACK: ${fallbackUnit.name} shifted to unoccupied tile (${randomMove.c}, ${randomMove.r})`);
+    if (openBaseTarget && movableUnits.length > 0) {
+        movableUnits.sort((a, b) => {
+            let distA = Math.max(Math.abs(a.gridX - openBaseTarget.c), Math.abs(a.gridY - openBaseTarget.r));
+            let distB = Math.max(Math.abs(b.gridX - openBaseTarget.c), Math.abs(b.gridY - openBaseTarget.r));
+            return distA - distB;
+        });
+
+        let leadUnit = movableUnits[0];
+        let pathToCore = findPathToTarget(leadUnit, openBaseTarget.c, openBaseTarget.r, unitPowerMap, blueUnits, true);
+
+        if (pathToCore && pathToCore.length > 0) {
+            let maxRange = getUnitMaxRange(leadUnit);
+            let stepsToTake = Math.min(pathToCore.length, maxRange);
+            let finalDestination = pathToCore[stepsToTake - 1];
+
+            if (!units.some(u => u.gridX === finalDestination.c && u.gridY === finalDestination.r)) {
+                if (typeof tryMoveUnit === 'function') {
+                    tryMoveUnit(leadUnit, finalDestination.c, finalDestination.r);
+                    if (typeof checkWinConditions === 'function') checkWinConditions(units);
+                    setTimeout(() => { currentTurn = 'blue'; }, 800);
+                    return;
+                }
             }
+        }
+    }
+
+    // =========================================================================
+    // STEP 4: ADVANCED ATTRACTION/REPULSION MATRIX
+    // =========================================================================
+    let advancedMoveMade = false;
+
+    movableUnits.sort((a, b) => {
+        let hazardA = getPositionHazardLevel({ c: a.gridX, r: a.gridY }, a, unitPowerMap, blueUnits);
+        let hazardB = getPositionHazardLevel({ c: b.gridX, r: b.gridY }, b, unitPowerMap, blueUnits);
+        return hazardB - hazardA;
+    });
+
+    for (let unit of movableUnits) {
+        if (getPositionHazardLevel({ c: unit.gridX, r: unit.gridY }, unit, unitPowerMap, blueUnits) > 0) {
+            continue;
+        }
+
+        let bestMove = typeof evaluateAdvancedBotMoves === 'function' 
+            ? evaluateAdvancedBotMoves(unit, units, typeof goldCores !== 'undefined' ? goldCores : []) 
+            : null;
+
+        if (bestMove) {
+            if (!units.some(u => u.gridX === bestMove.c && u.gridY === bestMove.r)) {
+                if (typeof tryMoveUnit === 'function') {
+                    tryMoveUnit(unit, bestMove.c, bestMove.r);
+                    advancedMoveMade = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (advancedMoveMade) {
+        if (typeof checkWinConditions === 'function') checkWinConditions(units);
+        setTimeout(() => { currentTurn = 'blue'; }, 800);
+        return;
+    }
+
+    // // =========================================================================
+    // STEP 5: FALLBACK MOVE
+    // =========================================================================
+    let fallbackUnit = movableUnits[0];
+    let moves = getLegalMoves(fallbackUnit);
+    let unoccupiedMoves = moves ? moves.filter(m => !units.some(u => u.gridX === m.c && u.gridY === m.r)) : [];
+    
+    if (unoccupiedMoves.length > 0) {
+        let randomMove = unoccupiedMoves[Math.floor(Math.random() * unoccupiedMoves.length)];
+        if (typeof tryMoveUnit === 'function') {
+            tryMoveUnit(fallbackUnit, randomMove.c, randomMove.r);
         }
     }
 
