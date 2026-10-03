@@ -472,23 +472,4 @@ function executeRedBotTurn() {
     // STEP 5: FALLBACK MOVE
     // =========================================================================
     let fallbackUnit = movableUnits[0];
-    let moves = getLegalMoves(fallbackUnit);
-    let unoccupiedMoves = moves ? moves.filter(m => !units.some(u => u.gridX === m.c && u.gridY === m.r)) : [];
-    
-    if (unoccupiedMoves.length > 0) {
-        let randomMove = unoccupiedMoves[Math.floor(Math.random() * unoccupiedMoves.length)];
-        if (typeof tryMoveUnit === 'function') {
-            tryMoveUnit(fallbackUnit, randomMove.c, randomMove.r);
-        }
-    }
-
-    setTimeout(() => {
-        currentTurn = 'blue';
-    }, 800);
-}
-
-setInterval(() => {
-    if (typeof gameOver !== 'undefined' && !gameOver && typeof currentTurn !== 'undefined' && currentTurn === 'red') {
-        setTimeout(executeRedBotTurn, 600);
-    }
-}, 1500);
+   
