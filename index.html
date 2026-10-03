@@ -446,16 +446,29 @@
         });
     </script>
 
-    <script src="console.js" onerror="console.error('Failed console.js');"></script>
+                <script src="console.js" onerror="console.error('Failed console.js');"></script>
     <script src="map_setup.js" onerror="console.error('Failed map_setup');"></script>
     <script src="team_core.js" onerror="console.error('Failed team_core');"></script>
     <script src="renderer.js" onerror="console.error('Failed renderer.js');"></script>
     <script src="combat_mechanics.js" onerror="console.error('Failed combat_mechanics');"></script>
     <script src="sound.js" onerror="console.error('Failed sound.js');"></script> 
     <script src="unit_movement.js" onerror="console.error('Failed unit_movement');"></script>
+    
+    <!-- ADD THIS LINE: Loads the Tutorial Guide & Chat Cloud UI controller -->
+    <script src="tutorial_guide.js" onerror="console.error('Failed tutorial_guide.js');"></script>
+
     <script src="ailogic.js" onerror="console.error('Failed ailogic.js');"></script>
     <script src="red_bot.js" onerror="console.error('Failed red_bot_2.js');"></script>
+    
+    <!-- Load level data definitions first -->
+    <script src="info.js" onerror="console.error('Failed info.js');"></script>
+    <!-- Load game core UI & profile logic -->
     <script src="game.js" onerror="console.error('Failed game.js');"></script>
+    <!-- Load gamelogic handlers last -->
+    <script src="gamelogic.js" onerror="console.error('Failed gamelogic.js');"></script>
+
+
+
 
 </body>
 </html>
