@@ -326,6 +326,11 @@ function update() {
         drawTeamUIAndFlags();
     }
 
+    // Renders active tutorial target outlines and directional arrows
+    if (typeof TutorialGuide !== 'undefined') {
+        TutorialGuide.renderBattlefieldOverlays(ctx);
+    }
+
     units.forEach(u => {
         let targetX = u.gridX * cellSize;
         let targetY = u.gridY * cellSize;
