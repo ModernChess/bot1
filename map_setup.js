@@ -1,8 +1,7 @@
 // =========================================================================
-// MAP SETUP & ASSET INITIALIZATION CONTROLLER
+// MAP SETUP & ASSET INITIALIZATION CONTROLLER (Optimized)
 // =========================================================================
 
-// References the main canvas element from the HTML document DOM
 const canvas = document.getElementById('gameCanvas');
 if (!canvas) {
     console.error("[ERROR][map_setup] Canvas element with ID 'gameCanvas' not found in DOM.");
@@ -24,23 +23,16 @@ const repoBaseUrl = 'https://raw.githubusercontent.com/ModernChess/assets-images
 
 // Dynamic Loading Screen Overlay Element Creation
 const loadingOverlay = document.createElement('div');
-loadingOverlay.style.position = 'fixed';
-loadingOverlay.style.top = '0';
-loadingOverlay.style.left = '0';
-loadingOverlay.style.width = '100vw';
-loadingOverlay.style.height = '100vh';
-loadingOverlay.style.backgroundColor = '#111111';
-loadingOverlay.style.zIndex = '9999';
-loadingOverlay.style.display = 'flex';
-loadingOverlay.style.flexDirection = 'column';
-loadingOverlay.style.justifyContent = 'center';
-loadingOverlay.style.alignItems = 'center';
-loadingOverlay.style.color = '#ffffff';
-loadingOverlay.style.fontFamily = 'sans-serif';
+loadingOverlay.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background-color: #111111; z-index: 9999; display: flex;
+    flex-direction: column; justify-content: center; align-items: center;
+    color: #ffffff; font-family: sans-serif;
+`;
 loadingOverlay.innerHTML = `
     <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading Game Assets...</h3>
     <div style="width: 240px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; border: 1px solid #333;">
-        <div id="progressBar" style="width: 0%; height: 100%; background: #2ecc71; transition: width 0.1s ease;"></div>
+        <div id="progressBar" style="width: 0%; height: 100%; background: #2ecc71; transition: width 0.2s ease;"></div>
     </div>
     <span id="progressText" style="margin-top: 10px; font-size: 13px; color: #aaa;">0%</span>
 `;
@@ -50,23 +42,23 @@ const progressBar = document.getElementById('progressBar');
 const progressText = document.getElementById('progressText');
 
 const assetEntries = [
-    { url: `${repoBaseUrl}map_8.jpg` },
-    { url: `${repoBaseUrl}blueantiair.png` },
-    { url: `${repoBaseUrl}redantiair.png` },
-    { url: `${repoBaseUrl}blueartillery.png` },
-    { url: `${repoBaseUrl}redartillery.png` },
-    { url: `${repoBaseUrl}blueengineer.png` },
-    { url: `${repoBaseUrl}redengineer.png` },
-    { url: `${repoBaseUrl}blueinfantry.png` },
-    { url: `${repoBaseUrl}redinfantry.png` },
-    { url: `${repoBaseUrl}bluemine.png` },
-    { url: `${repoBaseUrl}redmine.png` },
-    { url: `${repoBaseUrl}blueplane.png` },
-    { url: `${repoBaseUrl}redplane.png` },
-    { url: `${repoBaseUrl}blueship.png` },
-    { url: `${repoBaseUrl}redship.png` },
-    { url: `${repoBaseUrl}bluetank.png` },
-    { url: `${repoBaseUrl}redtank.png` }
+    { key: 'map', url: `${repoBaseUrl}map_8.jpg` },
+    { key: 'blueAntiair', url: `${repoBaseUrl}blueantiair.png` },
+    { key: 'redAntiair', url: `${repoBaseUrl}redantiair.png` },
+    { key: 'blueArtillery', url: `${repoBaseUrl}blueartillery.png` },
+    { key: 'redArtillery', url: `${repoBaseUrl}redartillery.png` },
+    { key: 'blueEngineer', url: `${repoBaseUrl}blueengineer.png` },
+    { key: 'redEngineer', url: `${repoBaseUrl}redengineer.png` },
+    { key: 'blueInfantry', url: `${repoBaseUrl}blueinfantry.png` },
+    { key: 'redInfantry', url: `${repoBaseUrl}redinfantry.png` },
+    { key: 'blueMine', url: `${repoBaseUrl}bluemine.png` },
+    { key: 'redMine', url: `${repoBaseUrl}redmine.png` },
+    { key: 'bluePlane', url: `${repoBaseUrl}blueplane.png` },
+    { key: 'redPlane', url: `${repoBaseUrl}redplane.png` },
+    { key: 'blueShip', url: `${repoBaseUrl}blueship.png` },
+    { key: 'redShip', url: `${repoBaseUrl}redship.png` },
+    { key: 'blueTank', url: `${repoBaseUrl}bluetank.png` },
+    { key: 'redTank', url: `${repoBaseUrl}redtank.png` }
 ];
 
 let loadedCount = 0;
@@ -92,64 +84,77 @@ let redTankImg = new Image(), redTankLoaded = false;
 
 function updateLoadingProgress() {
     loadedCount++;
-    let percent = Math.floor((loadedCount / totalAssets) * 100);
+    let percent = Math.min(100, Math.floor((loadedCount / totalAssets) * 100));
     if (progressBar) progressBar.style.width = percent + '%';
     if (progressText) progressText.innerText = percent + '%';
 
     if (loadedCount >= totalAssets) {
         console.log("[SUCCESS][map_setup] All game assets loaded successfully.");
-        setTimeout(() => {
-            loadingOverlay.style.opacity = '0';
-            loadingOverlay.style.transition = 'opacity 0.4s ease';
-            setTimeout(() => loadingOverlay.remove(), 400);
-        }, 300);
+        dismissLoadingScreen();
     }
 }
 
-function loadOnlineAsset(url, imgObj, setLoadedFlag) {
-    fetch(url)
-        .then(response => {
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            return response.blob();
-        })
-        .then(blob => {
-            let objectURL = URL.createObjectURL(blob);
-            imgObj.src = objectURL;
-            imgObj.onload = () => {
-                setLoadedFlag(true);
-                updateLoadingProgress();
-            };
-        })
-        .catch(err => {
-            imgObj.src = url;
-            imgObj.onload = () => {
-                setLoadedFlag(true);
-                updateLoadingProgress();
-            };
-            imgObj.onerror = (loadErr) => {
-                console.error(`[ERROR][map_setup] Failed to load asset: ${url}`, loadErr);
-                updateLoadingProgress();
-            };
-        });
+function dismissLoadingScreen() {
+    setTimeout(() => {
+        if (loadingOverlay && loadingOverlay.parentNode) {
+            loadingOverlay.style.opacity = '0';
+            loadingOverlay.style.transition = 'opacity 0.4s ease';
+            setTimeout(() => loadingOverlay.remove(), 400);
+        }
+    }, 200);
 }
 
-loadOnlineAsset(`${repoBaseUrl}map_8.jpg`, mapImg, (val) => { mapLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}blueantiair.png`, blueAntiairImg, (val) => { blueAntiairLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}redantiair.png`, redAntiairImg, (val) => { redAntiairLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}blueartillery.png`, blueArtilleryImg, (val) => { blueArtilleryLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}redartillery.png`, redArtilleryImg, (val) => { redArtilleryLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}blueengineer.png`, blueEngineerImg, (val) => { blueEngineerLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}redengineer.png`, redEngineerImg, (val) => { redEngineerLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}blueinfantry.png`, blueInfantryImg, (val) => { blueInfantryLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}redinfantry.png`, redInfantryImg, (val) => { redInfantryLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}bluemine.png`, blueMineImg, (val) => { blueMineLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}redmine.png`, redMineImg, (val) => { redMineLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}blueplane.png`, bluePlaneImg, (val) => { bluePlaneLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}redplane.png`, redPlaneImg, (val) => { redPlaneLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}blueship.png`, blueShipImg, (val) => { blueShipLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}redship.png`, redShipImg, (val) => { redShipLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}bluetank.png`, blueTankImg, (val) => { blueTankLoaded = val; });
-loadOnlineAsset(`${repoBaseUrl}redtank.png`, redTankImg, (val) => { redTankLoaded = val; });
+// Failsafe: Force-dismiss loading overlay after 6 seconds even if a CDN asset stalls
+setTimeout(() => {
+    if (loadedCount < totalAssets) {
+        console.warn("[WARN][map_setup] Loading timeout reached. Force-dismissing loading screen.");
+        dismissLoadingScreen();
+    }
+}, 6000);
+
+function loadAssetDirectly(url, imgObj, setLoadedFlag) {
+    imgObj.crossOrigin = "anonymous";
+    imgObj.onload = () => {
+        setLoadedFlag(true);
+        updateLoadingProgress();
+    };
+    imgObj.onerror = (err) => {
+        console.error(`[ERROR][map_setup] Failed to load asset: ${url}`, err);
+        // Still count it as processed so the loading bar doesn't freeze permanently
+        setLoadedFlag(true);
+        updateLoadingProgress();
+    };
+    imgObj.src = url;
+}
+
+// Map key assignments to actual Image objects
+const imageBindingMap = {
+    'map': { obj: mapImg, flag: (val) => { mapLoaded = val; } },
+    'blueAntiair': { obj: blueAntiairImg, flag: (val) => { blueAntiairLoaded = val; } },
+    'redAntiair': { obj: redAntiairImg, flag: (val) => { redAntiairLoaded = val; } },
+    'blueArtillery': { obj: blueArtilleryImg, flag: (val) => { blueArtilleryLoaded = val; } },
+    'redArtillery': { obj: redArtilleryImg, flag: (val) => { redArtilleryLoaded = val; } },
+    'blueEngineer': { obj: blueEngineerImg, flag: (val) => { blueEngineerLoaded = val; } },
+    'redEngineer': { obj: redEngineerImg, flag: (val) => { redEngineerLoaded = val; } },
+    'blueInfantry': { obj: blueInfantryImg, flag: (val) => { blueInfantryLoaded = val; } },
+    'redInfantry': { obj: redInfantryImg, flag: (val) => { redInfantryLoaded = val; } },
+    'blueMine': { obj: blueMineImg, flag: (val) => { blueMineLoaded = val; } },
+    'redMine': { obj: redMineImg, flag: (val) => { redMineLoaded = val; } },
+    'bluePlane': { obj: bluePlaneImg, flag: (val) => { bluePlaneLoaded = val; } },
+    'redPlane': { obj: redPlaneImg, flag: (val) => { redPlaneLoaded = val; } },
+    'blueShip': { obj: blueShipImg, flag: (val) => { blueShipLoaded = val; } },
+    'redShip': { obj: redShipImg, flag: (val) => { redShipLoaded = val; } },
+    'blueTank': { obj: blueTankImg, flag: (val) => { blueTankLoaded = val; } },
+    'redTank': { obj: redTankImg, flag: (val) => { redTankLoaded = val; } }
+};
+
+// Trigger parallel non-blocking loads for all assets
+assetEntries.forEach(entry => {
+    let binding = imageBindingMap[entry.key];
+    if (binding) {
+        loadAssetDirectly(entry.url, binding.obj, binding.flag);
+    }
+});
 
 function getTerrain(c, r) {
     const colChar = String.fromCharCode(65 + c);
@@ -208,7 +213,6 @@ function getPortSquare(team) {
     return {c:0, r:0};
 }
 
-// Spawns initial units preserving the original placement logic structure
 function spawnTeam(team) {
     let isBlue = (team === 'blue');
     let baseSquares = getBaseSquares(team);
@@ -246,7 +250,7 @@ function spawnTeam(team) {
             img: template.img,
             loaded: template.loaded,
             team: team,
-            facing: 0 // Default facing up
+            facing: 0
         });
     });
 
@@ -256,4 +260,4 @@ function spawnTeam(team) {
 spawnTeam('blue');
 spawnTeam('red');
 
-console.log("[SUCCESS][map_setup] Map setup initialization complete with original base coordinate matching.");
+console.log("[SUCCESS][map_setup] Optimized map setup initialization complete.");
