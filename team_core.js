@@ -52,6 +52,7 @@ function getTeamFromUnit(unit) {
 
     let team = unit.gridY < 9 ? 'red' : 'blue';
     unit._assignedTeam = team;
+    unit.team = team;
     return team;
 }
 
@@ -164,12 +165,11 @@ function checkWinConditions(allUnits) {
     let blueUnits = allUnits.filter(u => getTeamFromUnit(u) === 'blue');
     let redUnits = allUnits.filter(u => getTeamFromUnit(u) === 'red');
 
+    // FIXED: Strict combat stalemate check. Only triggers if units are explicitly locked in combat stalemate.
     let isTeamCompletelyStalmated = (teamUnits) => {
         if (teamUnits.length === 0) return false;
         return teamUnits.every(u => {
-            if (typeof isUnitLockedInStalemate === 'function' && isUnitLockedInStalemate(u, allUnits)) return true;
-            let moves = typeof getLegalMoves === 'function' ? getLegalMoves(u) : [];
-            return !moves || moves.length === 0;
+            return typeof isUnitLockedInStalemate === 'function' && isUnitLockedInStalemate(u, allUnits);
         });
     };
 
@@ -202,15 +202,6 @@ function triggerPostGameReload() {
             totalUserXp += earnedXpReward;
             localStorage.setItem(`chess_campaign_xp_${cachedUser}`, totalUserXp);
         }
-
-        // FIXED: Level increment removed here to prevent double-incrementing / level skipping. 
-        // game.js handles currentCampaignLevel progression exclusively now.
-        /*
-        if (typeof currentCampaignLevel !== 'undefined' && currentCampaignLevel < 15) {
-            currentCampaignLevel++;
-            localStorage.setItem(`chess_campaign_level_${cachedUser}`, currentCampaignLevel);
-        }
-        */
 
         if (typeof getPlayerRank === 'function') {
             let rankData = getPlayerRank(totalUserXp);
