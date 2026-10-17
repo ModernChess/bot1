@@ -33,7 +33,8 @@
                 </div>
             </div>
 
-            <canvas id="gameCanvas" width="540" height="540"></canvas>
+            <!-- Canvas with touch-action: none to prevent page panning/zooming interference -->
+            <canvas id="gameCanvas" width="540" height="540" style="touch-action: none;"></canvas>
 
             <!-- Shop Modal Menu -->
             <div id="shop-modal">
@@ -87,7 +88,18 @@
     <script src="renderer.js" onerror="console.error('Failed renderer.js');"></script>
     <script src="combat_mechanics.js" onerror="console.error('Failed combat_mechanics');"></script>
     <script src="sound.js" onerror="console.error('Failed sound.js');"></script> 
-    <script src="unit_movement.js" onerror="console.error('Failed unit_movement');"></script>
+    
+    <!-- Viewport controller initialization -->
+    <script type="module">
+        import { initViewportControls } from './viewport.js';
+        const canvas = document.getElementById('gameCanvas');
+        if (canvas) {
+            initViewportControls(canvas, () => {});
+        }
+    </script>
+
+    <!-- unit_movement.js loaded with type="module" to support imports -->
+    <script type="module" src="unit_movement.js" onerror="console.error('Failed unit_movement');"></script>
     
     <!-- Loads the Tutorial Guide & Chat Cloud UI controller -->
     <script src="tutorial_guide.js" onerror="console.error('Failed tutorial_guide.js');"></script>
