@@ -9,7 +9,6 @@ const RendererLog = {
 function drawTeamUIAndFlags() {
     let now = performance.now();
 
-    // Synchronize external HTML DOM match XP bar & Turn Badge elements
     let turnBadgeEl = document.getElementById('external-turn-badge');
     if (turnBadgeEl) {
         let turnText = `● TURN: ${currentTurn.toUpperCase()}`;
@@ -26,26 +25,26 @@ function drawTeamUIAndFlags() {
         xpFillEl.style.width = `${progressRatio}%`;
     }
 
-    // 2. Sleek Modern Glassmorphism Game Over Card
+    // Modern Glassmorphism Game Over Card
     if (gameOver) {
         ctx.save();
-        ctx.fillStyle = 'rgba(5, 10, 20, 0.78)';
+        ctx.fillStyle = 'rgba(18, 18, 18, 0.75)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         let cardW = Math.min(canvas.width * 0.88, 460);
         let cardH = 160;
         let cardX = (canvas.width - cardW) / 2;
         let cardY = (canvas.height - cardH) / 2;
-        let cardRadius = 14;
+        let cardRadius = 16;
 
-        ctx.shadowColor = 'rgba(59, 130, 246, 0.45)';
-        ctx.shadowBlur = 30;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 35;
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 10;
+        ctx.shadowOffsetY = 15;
 
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
-        ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(18, 18, 18, 0.92)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1.5;
 
         ctx.beginPath();
         ctx.moveTo(cardX + cardRadius, cardY);
@@ -66,33 +65,33 @@ function drawTeamUIAndFlags() {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = 'bold 11px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#b0b0b0';
+        ctx.font = 'bold 11px "Poppins", "Segoe UI", sans-serif';
         ctx.fillText("MISSION STATUS: COMPLETED", canvas.width / 2, cardY + 36);
 
         let isBlueWin = winnerMessage.includes('BLUE');
         let isRedWin = winnerMessage.includes('RED');
         ctx.fillStyle = isBlueWin ? '#38bdf8' : (isRedWin ? '#f87171' : '#fbbf24');
         
-        ctx.font = 'bold 13px "Segoe UI", sans-serif';
+        ctx.font = 'bold 14px "Poppins", "Segoe UI", sans-serif';
         ctx.fillText(winnerMessage, canvas.width / 2, cardY + 82);
 
-        ctx.fillStyle = '#64748b';
-        ctx.font = '11px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#8c8c8c';
+        ctx.font = '11px "Poppins", "Segoe UI", sans-serif';
         ctx.fillText("🔄 Reloading next tactical deployment...", canvas.width / 2, cardY + 124);
         
         ctx.restore();
         return;
     }
 
-    // 3. Bot Path Overlay
+    // Bot Path Overlay
     ctx.save();
     if (window.activeRedBotPath && window.activeRedBotPath.length > 0) {
         window.activeRedBotPath.forEach((tile, index) => {
             let cx = tile.c * cellSize + cellSize / 2;
             let cy = tile.r * cellSize + cellSize / 2;
 
-            ctx.fillStyle = '#ff3333';
+            ctx.fillStyle = '#ef4444';
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 1.5;
 
@@ -109,13 +108,13 @@ function drawTeamUIAndFlags() {
         });
     }
 
-    // 4. Gold Cores & Capture Flag Animations
+    // Gold Cores & Capture Flag Animations
     goldCores.forEach(core => {
         let cx = core.c * cellSize + cellSize / 2;
         let cy = core.r * cellSize + cellSize / 2;
 
         if (core.owner) {
-            ctx.fillStyle = core.owner === 'blue' ? '#3498db' : '#e74c3c';
+            ctx.fillStyle = core.owner === 'blue' ? '#3b82f6' : '#ef4444';
             ctx.beginPath();
             ctx.arc(cx, cy, cellSize * 0.25, 0, Math.PI * 2);
             ctx.fill();
@@ -132,9 +131,9 @@ function drawTeamUIAndFlags() {
                 let dropOffset = (1 - Math.cos(progress * Math.PI * 0.5)) * (cellSize * 1.5);
                 let renderY = cy - (cellSize * 1.5) + dropOffset;
 
-                ctx.fillStyle = core.owner === 'blue' ? '#2980b9' : '#c0392b';
+                ctx.fillStyle = core.owner === 'blue' ? '#2563eb' : '#dc2626';
                 ctx.fillRect(cx - 4, renderY, 8, cellSize * 0.8);
-                ctx.fillStyle = '#f1c40f';
+                ctx.fillStyle = '#f59e0b';
                 ctx.beginPath();
                 ctx.moveTo(cx + 4, renderY);
                 ctx.lineTo(cx + 16, renderY + 6);
@@ -146,7 +145,7 @@ function drawTeamUIAndFlags() {
         }
     });
 
-    // 5. Circular Superunit Power Badges with Stalemate 🔒 Badge Support
+    // Circular Superunit Power Badges with Stalemate 🔒 Badge Support
     let mapCenterX = canvas.width / 2;
     let mapCenterY = canvas.height / 2;
 
@@ -155,7 +154,6 @@ function drawTeamUIAndFlags() {
         suList.forEach(su => {
             let isStalocked = su.units.some(u => isUnitLockedInStalemate(u, units));
             
-            // FIX: Do not skip single units if they are locked in a stalemate!
             if (su.units.length <= 1 && su.power !== Infinity && !su.isSpecialSuperunit && !isStalocked) return;
 
             let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
@@ -179,15 +177,14 @@ function drawTeamUIAndFlags() {
 
             let badgeCenterX = unitCenterX + offsetX;
             let badgeCenterY = unitCenterY + offsetY;
-            let badgeRadius = 14; // Compact circular badge size
+            let badgeRadius = 14;
 
-            ctx.fillStyle = '#cc0000';
+            ctx.fillStyle = '#ef4444';
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2;
             let powerDisplay = su.power === Infinity ? '∞' : su.power;
             let lockedText = isStalocked ? ' 🔒' : '';
             
-            // Draw circular frame background
             ctx.beginPath();
             ctx.arc(badgeCenterX, badgeCenterY, badgeRadius, 0, Math.PI * 2);
             ctx.fill();
