@@ -22,19 +22,21 @@ const TutorialGuide = {
         cloud.style.cssText = `
             display: none;
             position: fixed;
-            bottom: 85px; /* Shifted higher up to prevent overlap with bottom console/panels */
+            bottom: 85px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(15, 23, 42, 0.95);
-            border: 2px solid #3b82f6;
-            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.5);
+            background: rgba(18, 18, 18, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1);
             padding: 14px 20px;
-            border-radius: 12px;
+            border-radius: 16px;
             color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Poppins', 'Segoe UI', sans-serif;
             font-size: 13px;
-            font-weight: 700;
-            z-index: 99999; /* Increased z-index to stay on top of everything */
+            font-weight: 600;
+            z-index: 99999;
             max-width: 440px;
             width: 90%;
             text-align: center;
@@ -44,9 +46,9 @@ const TutorialGuide = {
         cloud.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 4px;">
                 <span style="font-size: 16px;">🤖</span>
-                <span style="color: #60a5fa; text-transform: uppercase; font-size: 11px; letter-spacing: 1px;">Tactical AI Advisor</span>
+                <span style="color: #60a5fa; text-transform: uppercase; font-size: 11px; letter-spacing: 1.2px; font-weight: 800;">Tactical AI Advisor</span>
             </div>
-            <div id="tutorialCloudMessage" style="line-height: 1.4; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);"></div>
+            <div id="tutorialCloudMessage" style="line-height: 1.5; text-shadow: 0 2px 4px rgba(0,0,0,0.6);"></div>
         `;
         document.body.appendChild(cloud);
     },
@@ -72,14 +74,13 @@ const TutorialGuide = {
 
         if (!cloudEl || !msgEl) return;
 
-        // Active for Tutorials 1 to 5, and Stages 1 to 15 (levels 6 through 20)
         if (typeof currentCampaignLevel !== 'undefined' && ((currentCampaignLevel >= 1 && currentCampaignLevel <= 5) || (currentCampaignLevel >= 6 && currentCampaignLevel <= 20))) {
             cloudEl.style.display = 'block';
             this.active = true;
 
             if (currentCampaignLevel === 1) {
                 this.currentStepText = "Tutorial (1): \"Zoom in to properly select the unit and select which tile to move to! Follow the glowing red pathfinders toward the base.\"";
-                this.targetPosition = { c: 17, r: 0 }; // Red base coordinate from info.js
+                this.targetPosition = { c: 17, r: 0 }; 
                 this.targetUnitName = null;
             } else if (currentCampaignLevel === 2) {
                 this.currentStepText = "Tutorial (2): \"Keep up the momentum! Follow the pathfinder markers toward the base and maneuver your heavy tank forward.\"";
@@ -87,15 +88,13 @@ const TutorialGuide = {
                 this.targetUnitName = null;
             } else if (currentCampaignLevel === 3) {
                 this.currentStepText = "Tutorial (3): \"Enemy contact! Direct your tank straight toward the opposing infantry and eliminate them.\"";
-                // Scan for enemy infantry on the battlefield
                 const enemyInfantry = typeof units !== 'undefined' ? units.find(u => u.team === 'red' && u.name === 'Infantry') : null;
                 if (enemyInfantry) {
                     this.targetPosition = { c: enemyInfantry.gridX, r: enemyInfantry.gridY };
                     this.targetUnitName = 'Infantry';
                 }
             } else if (currentCampaignLevel === 4) {
-                this.currentStepText = "Tutorial (4): \"Coordinate your assault! Note that the 🔒 symbol indicates a locked unit. Join forces with your secondary unit to break the deadlock and destroy the target!\"";
-                // Scan for enemy infantry and target the one closest to the blue base (c: 0, r: 11)
+                this.currentStepText = "Tutorial (4): \"Coordinate your assault! Join forces with your secondary unit to break the deadlock and destroy the target!\"";
                 const redInfantries = typeof units !== 'undefined' ? units.filter(u => u.team === 'red' && u.name === 'Infantry') : [];
                 if (redInfantries.length > 0) {
                     let targetInf = redInfantries[0];
@@ -111,8 +110,7 @@ const TutorialGuide = {
                     this.targetUnitName = 'Infantry';
                 }
             } else if (currentCampaignLevel === 5) {
-                this.currentStepText = "Tutorial (5): \"Heavy armor incoming! The 🔒 symbol marks a locked asset. Synchronize your strike with companion units to pierce their defenses and obliterate them!\"";
-                // Scan for enemy tanks and target the one closest to the blue base (c: 0, r: 11)
+                this.currentStepText = "Tutorial (5): \"Heavy armor incoming! Synchronize your strike with companion units to pierce their defenses and obliterate them!\"";
                 const redTanks = typeof units !== 'undefined' ? units.filter(u => u.team === 'red' && u.name === 'Tank') : [];
                 if (redTanks.length > 0) {
                     let targetTank = redTanks[0];
@@ -128,7 +126,6 @@ const TutorialGuide = {
                     this.targetUnitName = 'Tank';
                 }
             } else {
-                // Campaign Stages (Levels 6 to 20 map precisely to Stages 1 to 15)
                 const stageNum = currentCampaignLevel - 5;
                 this.targetPosition = { c: 11, r: 0 }; 
                 this.targetUnitName = null;
@@ -150,12 +147,10 @@ const TutorialGuide = {
                 } else if (stageNum === 8) {
                     this.currentStepText = `Stage (8): "You are facing a heavily scattered enemy vanguard. Plan your counter-offensive and conquer the battlefield!"`;
                 } else {
-                    // Stages 9 through 15 (Levels 14 through 20) with dynamically synced stage numbers in the randomized text
                     this.currentStepText = this.getRandomMessageForStage(currentCampaignLevel, stageNum);
                 }
             }
 
-            // Apply shared pathfinder calculation for all Stages (Level 6 and above)
             if (currentCampaignLevel >= 6) {
                 if (typeof units !== 'undefined' && typeof findPathToTarget === 'function') {
                     const blueUnit = units.find(u => u.team === 'blue');
@@ -182,7 +177,6 @@ const TutorialGuide = {
     renderBattlefieldOverlays(ctx) {
         if (!this.active) return;
 
-        // TUTORIAL 3, 4 & 5: Scan units and highlight target with a thicker, dark green outline
         if (typeof currentCampaignLevel !== 'undefined' && (currentCampaignLevel >= 3 && currentCampaignLevel <= 5)) {
             if (typeof units !== 'undefined' && this.targetUnitName) {
                 units.forEach(u => {
@@ -191,9 +185,9 @@ const TutorialGuide = {
                         let ry = u.renderY !== undefined ? u.renderY : u.gridY * cellSize;
 
                         ctx.save();
-                        ctx.strokeStyle = '#15803d'; // Dark green outline
-                        ctx.lineWidth = 6;           // Increased thickness
-                        ctx.shadowColor = '#15803d';
+                        ctx.strokeStyle = '#10b981';
+                        ctx.lineWidth = 6;
+                        ctx.shadowColor = '#10b981';
                         ctx.shadowBlur = 12;
                         ctx.strokeRect(rx + 2, ry + 2, cellSize - 4, cellSize - 4);
                         ctx.restore();
@@ -202,13 +196,12 @@ const TutorialGuide = {
             }
         }
 
-        // Draw red target circles for Tutorials and Stages pathfinder markers
         if (this.targetPosition) {
             let targetX = this.targetPosition.c * cellSize + cellSize / 2;
             let targetY = this.targetPosition.r * cellSize + cellSize / 2;
 
             ctx.save();
-            ctx.strokeStyle = '#ef4444'; // Red circle indicator
+            ctx.strokeStyle = '#ef4444';
             ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -217,25 +210,22 @@ const TutorialGuide = {
             ctx.stroke();
             ctx.restore();
 
-            // TUTORIAL 3, 4 & 5 ONLY: Draw the green directional guidance arrow
             if (typeof currentCampaignLevel !== 'undefined' && (currentCampaignLevel >= 3 && currentCampaignLevel <= 5)) {
                 if (typeof selectedUnit !== 'undefined' && selectedUnit) {
                     let startX = (selectedUnit.renderX !== undefined ? selectedUnit.renderX : selectedUnit.gridX * cellSize) + cellSize / 2;
                     let startY = (selectedUnit.renderY !== undefined ? selectedUnit.renderY : selectedUnit.gridY * cellSize) + cellSize / 2;
 
                     ctx.save();
-                    ctx.strokeStyle = '#15803d'; // Dark green line
-                    ctx.fillStyle = '#15803d';   // Dark green arrow head
-                    ctx.lineWidth = 6;           // Increased thickness
+                    ctx.strokeStyle = '#10b981';
+                    ctx.fillStyle = '#10b981';
+                    ctx.lineWidth = 6;
                     ctx.setLineDash([8, 8]);
 
-                    // Draw dashed guidance line
                     ctx.beginPath();
                     ctx.moveTo(startX, startY);
                     ctx.lineTo(targetX, targetY);
                     ctx.stroke();
 
-                    // Draw arrow head
                     let angle = Math.atan2(targetY - startY, targetX - startX);
                     ctx.setLineDash([]);
                     ctx.beginPath();
@@ -252,12 +242,10 @@ const TutorialGuide = {
     }
 };
 
-// Initialize and hook into game loops
 window.addEventListener('load', () => {
     TutorialGuide.init();
 });
 
-// Run update checks continuously
 setInterval(() => {
     TutorialGuide.update();
 }, 250);
