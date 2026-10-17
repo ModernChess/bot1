@@ -259,7 +259,7 @@ function executeRedBotTurn() {
     }
 
     // =========================================================================
-    // STEP 1: ABSOLUTE BASE DEFENSE EMERGENCY OVERRIDE (Greater than Stalemate)
+    // STEP 1: ABSOLUTE BASE DEFENSE EMERGENCY OVERRIDE
     // =========================================================================
     let redBaseSquares = typeof getBaseSquares === 'function' ? getBaseSquares('red') : [{c: 11, r: 0}];
     let baseThreatDetected = false;
@@ -278,9 +278,8 @@ function executeRedBotTurn() {
     }
 
     if (baseThreatDetected && targetIntruder) {
-        console.warn(`[red_bot] 🚨 ABSOLUTE EMERGENCY: Intruder ${targetIntruder.name} within 5 tiles of Red Base! Alerting non-stalemated units to slam into target.`);
+        console.warn(`[red_bot] 🚨 ABSOLUTE EMERGENCY: Intruder ${targetIntruder.name} within 5 tiles of Red Base!`);
 
-        // FIXED: Explicitly filter out any stalemated units so they aren't chosen for emergency defense
         let emergencyDefenders = redUnits.filter(u => {
             let isStalemated = typeof isUnitLockedInStalemate === 'function' && isUnitLockedInStalemate(u, units);
             if (isStalemated) return false;
@@ -320,7 +319,6 @@ function executeRedBotTurn() {
             if (targetMove && !units.some(u => u.gridX === targetMove.c && u.gridY === targetMove.r)) {
                 if (typeof tryMoveUnit === 'function') {
                     tryMoveUnit(defendingUnit, targetMove.c, targetMove.r);
-                    console.log(`[red_bot] 💥 EMERGENCY STRIKE: Non-stalemated unit ${defendingUnit.name} slammed toward base intruder at (${targetMove.c}, ${targetMove.r}).`);
                     if (typeof checkWinConditions === 'function') checkWinConditions(units);
                     setTimeout(() => { currentTurn = 'blue'; }, 800);
                     return;
@@ -400,7 +398,7 @@ function executeRedBotTurn() {
     }
 
     // =========================================================================
-    // STEP 3: OFFENSIVE BASE CAPTURE (Only executed if base is safe)
+    // STEP 3: OFFENSIVE BASE CAPTURE
     // =========================================================================
     let blueBaseSquares = typeof getBaseSquares === 'function' ? getBaseSquares('blue') : [{c: 0, r: 11}];
     let openBaseTarget = blueBaseSquares.find(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
@@ -468,7 +466,7 @@ function executeRedBotTurn() {
         return;
     }
 
-    // // ==========================================================================
+    //   // =========================================================================
     // STEP 5: FALLBACK MOVE
     // =========================================================================
     let fallbackUnit = movableUnits[0];
