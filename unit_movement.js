@@ -2,9 +2,11 @@
 // UNIT MOVEMENT, INTERACTION, AND RENDERING LOOP CONTROLLER
 // =========================================================================
 
+import { getCameraState, screenToWorldCoordinates, applyCameraTransform } from './viewport.js';
+import { getGridCoordinatesFromClient } from './game-input.js';
+
 let selectedUnit = null;     
 let legalMoves = [];         
-let pressTimer = null;       
 let rangeMode = false;
 let rangeSquares = [];
 
@@ -94,7 +96,6 @@ function getLegalMoves(unit) {
             if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) {
                 if (typeof isGoldCore === 'function' && isGoldCore(nc, nr)) break;
 
-                // Stop pathing through any occupied square (friendly or enemy unit)
                 let isOccupied = units.some(u => u.gridX === nc && u.gridY === nr);
                 if (isOccupied) break;
 
@@ -201,23 +202,21 @@ function tryMoveUnit(unit, newC, newR) {
     return true;
 }
 
+// Precise input mapping with instant tap selection (no delay)
 canvas.addEventListener('pointerdown', (e) => {
     if (typeof currentTurn !== 'undefined' && currentTurn === 'red') {
         SystemLog.warn('Input ignored: It is currently Red bot turn. Human control is locked.');
         return;
     }
 
-    let rect = canvas.getBoundingClientRect();
-    let scaleX = canvas.width / rect.width;
-    let scaleY = canvas.height / rect.height;
+    const cam = getCameraState();
+    let gridCoord = getGridCoordinatesFromClient(e.clientX, e.clientY, canvas, cam.x, cam.y, cam.zoom, cols, rows);
+    if (!gridCoord) return;
 
-    let touchX = (e.clientX - rect.left) * scaleX;
-    let touchY = (e.clientY - rect.top) * scaleY;
+    let c = gridCoord.col;
+    let r = gridCoord.row;
 
-    let c = Math.floor(touchX / cellSize);
-    let r = Math.floor(touchY / cellSize);
-
-    if (!validateCoordinates(c, r)) return;
+    let worldCoord = screenToWorldCoordinates(e.clientX, e.clientY, canvas);
 
     if (r >= 0 && r < rows && c >= 0 && c < cols) {
         let clickedUnit = units.find(u => u.gridX === c && u.gridY === r && !u.invisible);
@@ -269,22 +268,21 @@ canvas.addEventListener('pointerdown', (e) => {
                 return; 
             }
 
-            pressTimer = setTimeout(() => {
-                selectedUnit = clickedUnit;
-                legalMoves = getLegalMoves(clickedUnit);
-                rangeMode = false; 
+            // Instant selection on tap without delay
+            selectedUnit = clickedUnit;
+            legalMoves = getLegalMoves(clickedUnit);
+            rangeMode = false; 
 
-                if (typeof window.triggerSelectSound === 'function') {
-                    window.triggerSelectSound(clickedUnit.name);
-                }
-            }, 5); 
+            if (typeof window.triggerSelectSound === 'function') {
+                window.triggerSelectSound(clickedUnit.name);
+            }
         } else {
             if (selectedUnit && ((selectedUnit.name || '').includes('Ship') || (selectedUnit.name || '').includes('Artillery'))) {
                 let btnX = selectedUnit.renderX + cellSize + 12;
                 let btnY = selectedUnit.renderY - 12;
                 let btnSize = cellSize * 0.85;
 
-                if (touchX >= btnX && touchX <= btnX + btnSize && touchY >= btnY && touchY <= btnY + btnSize) {
+                if (worldCoord.x >= btnX && worldCoord.x <= btnX + btnSize && worldCoord.y >= btnY && worldCoord.y <= btnY + btnSize) {
                     rangeMode = !rangeMode; 
                     rangeSquares = rangeMode ? getUnitCombatRange(selectedUnit) : [];
                     return;
@@ -299,9 +297,6 @@ canvas.addEventListener('pointerdown', (e) => {
     }
 });
 
-canvas.addEventListener('pointerup', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
-canvas.addEventListener('pointercancel', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
-
 function drawRotatedUnit(ctx, img, renderX, renderY, size, facingDegrees = 0) {
     ctx.save();
     let centerX = renderX + cellSize / 2;
@@ -315,6 +310,9 @@ function drawRotatedUnit(ctx, img, renderX, renderY, size, facingDegrees = 0) {
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    ctx.save();
+    applyCameraTransform(ctx);
+
     if (mapLoaded) {
         ctx.drawImage(mapImg, 0, 0, canvas.width, canvas.height);
     } else {
@@ -326,7 +324,6 @@ function update() {
         drawTeamUIAndFlags();
     }
 
-    // Renders active tutorial target outlines and directional arrows
     if (typeof TutorialGuide !== 'undefined') {
         TutorialGuide.renderBattlefieldOverlays(ctx);
     }
@@ -443,8 +440,13 @@ function update() {
         ctx.restore();
     }
 
+    ctx.restore();
     requestAnimationFrame(update);
 }
 
-SystemLog.info('Unit movement controller updated with sound triggers, modern indicators, and instant tap-to-move.');
+// Expose module functions globally so classic scripts like red_bot.js can access them
+window.getLegalMoves = getLegalMoves;
+window.tryMoveUnit = tryMoveUnit;
+
+SystemLog.info('Unit movement controller updated with instant tap selection and camera coordinate translation.');
 update();
