@@ -1,13 +1,16 @@
 // =========================================================================
 // CAMPAIGN, ACCOUNT RANK, & CACHE CONTROLLER (game.js)
-// Unlocked Test Mode: All levels selectable
+// Unlocked Test Mode: All levels selectable + Avatar, Faction, & Rank Integration
 // =========================================================================
 
 const cachedUser = localStorage.getItem('arena_chess_user') || 'GuestPlayer';
 let currentCampaignLevel = parseInt(localStorage.getItem(`chess_campaign_level_${cachedUser}`)) || 1;
 let totalUserXp = parseInt(localStorage.getItem(`chess_campaign_xp_${cachedUser}`)) || 0;
+let userAvatar = localStorage.getItem(`chess_campaign_avatar_${cachedUser}`) || localStorage.getItem('arena_chess_avatar') || '😀';
+let userFaction = localStorage.getItem('arena_chess_faction') || 'Order';
+let userRank = localStorage.getItem('arena_chess_rank') || 'Trainee ⭐';
 
-console.log(`[INFO][game.js] Logged into account: ${cachedUser} | Level: ${currentCampaignLevel} | Total Account XP: ${totalUserXp}`);
+console.log(`[INFO][game.js] Logged into account: ${cachedUser} | Level: ${currentCampaignLevel} | Total Account XP: ${totalUserXp} | Faction: ${userFaction} | Rank: ${userRank}`);
 
 function getPlayerRank(xp) {
     if (xp >= 300) return { title: "Grandmaster", color: "#f59e0b" };
@@ -33,7 +36,7 @@ function injectCampaignUI() {
     const shopBtn = document.getElementById('shop-btn');
     if (shopBtn) shopBtn.style.display = 'none';
 
-    let currentRank = getPlayerRank(totalUserXp);
+    let currentRankObj = getPlayerRank(totalUserXp);
 
     let campaignHud = document.getElementById('campaignHudContainer');
     if (!campaignHud) {
@@ -41,9 +44,19 @@ function injectCampaignUI() {
         campaignHud.id = 'campaignHudContainer';
         campaignHud.style.cssText = `display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; color: #ffffff; ${sharedTextShadow}`;
         
+        const avatarHTML = (userAvatar && (userAvatar.startsWith('data:image/') || userAvatar.startsWith('http')))
+            ? `<img src="${userAvatar}" style="width: 22px; height: 22px; min-width: 22px; min-height: 22px; aspect-ratio: 1 / 1; border-radius: 50%; object-fit: cover; vertical-align: middle;">`
+            : `<span style="font-size: 1.1rem; vertical-align: middle;">${userAvatar}</span>`;
+
+        const factionColor = userFaction === 'Order' ? '#00cec9' : '#ff7675';
+
         campaignHud.innerHTML = `
-            <div id="openAccountModalBtn" style="background: rgba(139, 92, 246, 0.25); border: 1px solid rgba(139, 92, 246, 0.5); padding: 5px 10px; border-radius: 8px; cursor: pointer;" title="View Profile">
-                👤 <span style="color: #c084fc;">${cachedUser}</span> [<span id="hudRankVal" style="color: ${currentRank.color};">${currentRank.title}</span>]
+            <div id="openAccountModalBtn" style="display: flex; align-items: center; gap: 6px; background: rgba(139, 92, 246, 0.25); border: 1px solid rgba(139, 92, 246, 0.5); padding: 4px 10px; border-radius: 8px; cursor: pointer;" title="View Profile">
+                <div id="hudAvatarContainer" style="width: 22px; height: 22px; min-width: 22px; min-height: 22px; aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+                    ${avatarHTML}
+                </div>
+                <span style="color: #c084fc;">${cachedUser}</span> 
+                <span style="color: ${factionColor}; font-size: 10px;">[${userFaction}]</span>
             </div>
             <div style="background: rgba(59, 130, 246, 0.25); border: 1px solid rgba(59, 130, 246, 0.5); padding: 5px 10px; border-radius: 8px;">
                 STAGE: <span id="hudLevelVal">T1</span> | XP: <span id="hudXpVal">${totalUserXp}</span>
@@ -54,6 +67,18 @@ function injectCampaignUI() {
 
         document.getElementById('openLevelSelectBtn').addEventListener('click', toggleLevelSelectModal);
         document.getElementById('openAccountModalBtn').addEventListener('click', toggleAccountModal);
+    }
+
+    // Hidden file input for direct profile avatar uploading
+    let fileInput = document.getElementById('globalGameAvatarUpload');
+    if (!fileInput) {
+        fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.id = 'globalGameAvatarUpload';
+        fileInput.accept = 'image/*';
+        fileInput.style.display = 'none';
+        fileInput.addEventListener('change', handleGameAvatarUpload);
+        document.body.appendChild(fileInput);
     }
 
     let accModal = document.getElementById('accountProfileModal');
@@ -84,6 +109,31 @@ function injectCampaignUI() {
     updateHudDisplay();
 }
 
+function handleGameAvatarUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        userAvatar = event.target.result;
+        localStorage.setItem(`chess_campaign_avatar_${cachedUser}`, userAvatar);
+        localStorage.setItem('arena_chess_avatar', userAvatar);
+        
+        renderAccountModalContent();
+        let hudContainer = document.getElementById('hudAvatarContainer');
+        if (hudContainer) {
+            hudContainer.innerHTML = `<img src="${userAvatar}" style="width: 100%; height: 100%; aspect-ratio: 1 / 1; border-radius: 50%; object-fit: cover;">`;
+        }
+        console.log("[SUCCESS][game.js] Profile avatar updated successfully.");
+    };
+    reader.readAsDataURL(file);
+}
+
+function triggerGameAvatarPicker() {
+    const input = document.getElementById('globalGameAvatarUpload');
+    if (input) input.click();
+}
+
 function getStageDisplayLabel(lvlNum) {
     return lvlNum <= 5 ? `T${lvlNum}` : `${lvlNum - 5}`;
 }
@@ -105,13 +155,28 @@ function renderAccountModalContent() {
     const modal = document.getElementById('accountProfileModal');
     if (!modal) return;
     let rank = getPlayerRank(totalUserXp);
+    let factionColor = userFaction === 'Order' ? '#00cec9' : '#ff7675';
+
+    const profileAvatarHTML = (userAvatar && (userAvatar.startsWith('data:image/') || userAvatar.startsWith('http')))
+        ? `<img src="${userAvatar}" style="width: 100%; height: 100%; aspect-ratio: 1 / 1; border-radius: 50%; object-fit: cover;">`
+        : `<span style="font-size: 28px;">${userAvatar}</span>`;
 
     modal.innerHTML = `
         <h3 style="margin-top: 0; color: #3b82f6; text-transform: uppercase; font-size: 15px; font-weight: 800; ${sharedTextShadow}">Player Profile</h3>
+        
+        <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 14px;">
+            <div style="width: 64px; height: 64px; min-width: 64px; min-height: 64px; aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden; border: 2px solid #8b5cf6; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; margin-bottom: 8px; box-shadow: 0 4px 12px rgba(139,92,246,0.3);">
+                ${profileAvatarHTML}
+            </div>
+            <button onclick="triggerGameAvatarPicker()" style="background: rgba(139, 92, 246, 0.3); border: 1px solid rgba(139, 92, 246, 0.6); color: #c084fc; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; cursor: pointer;">📷 Change Avatar</button>
+        </div>
+
         <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); padding: 14px; border-radius: 12px; margin-bottom: 16px; text-align: left; font-size: 12px; line-height: 1.6; color: #ffffff; ${sharedTextShadow}">
             <div>👤 <strong>Username:</strong> <span style="color: #c084fc;">${cachedUser}</span></div>
-            <div>🛡️ <strong>Campaign Rank:</strong> <span style="color: ${rank.color}; font-weight: bold;">${rank.title}</span></div>
-            <div>⭐ <strong>Total Account XP:</strong> ${totalUserXp} XP</div>
+            <div>🛡️ <strong>Faction:</strong> <span style="color: ${factionColor}; font-weight: bold;">${userFaction}</span></div>
+            <div>⭐ <strong>Class Rank:</strong> <span style="color: #00cec9; font-weight: bold;">${userRank}</span></div>
+            <div>🏆 <strong>Campaign Rank:</strong> <span style="color: ${rank.color}; font-weight: bold;">${rank.title}</span></div>
+            <div>⚡ <strong>Total Account XP:</strong> ${totalUserXp} XP</div>
             <div>🎯 <strong>Current Stage:</strong> ${getStageDisplayLabel(currentCampaignLevel)}</div>
         </div>
         <button onclick="toggleAccountModal()" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; width: 100%; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);">Close</button>
