@@ -6,9 +6,47 @@ const RendererLog = {
     success: (msg) => console.log(`[SUCCESS][renderer]: ${msg}`)
 };
 
+// Initialize independent HTML DOM Game Over Overlay
+function initGameOverDOMOverlay() {
+    if (document.getElementById('gameOverModalOverlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'gameOverModalOverlay';
+    overlay.style.cssText = `
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(18, 18, 18, 0.92);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1.5px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+        padding: 24px;
+        border-radius: 16px;
+        color: #fff;
+        z-index: 999999;
+        width: 90%;
+        max-width: 420px;
+        text-align: center;
+        font-family: 'Poppins', 'Segoe UI', sans-serif;
+    `;
+    overlay.innerHTML = `
+        <div style="font-size: 11px; font-weight: bold; color: #b0b0b0; letter-spacing: 1px; margin-bottom: 8px;">MISSION STATUS: COMPLETED</div>
+        <div id="gameOverMessageText" style="font-size: 14px; font-weight: bold; margin-bottom: 16px; text-shadow: 0 2px 4px rgba(0,0,0,0.6);"></div>
+        <div style="font-size: 11px; color: #8c8c8c;">🔄 Reloading next tactical deployment...</div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+window.addEventListener('load', () => {
+    initGameOverDOMOverlay();
+});
+
 function drawTeamUIAndFlags() {
     let now = performance.now();
 
+    // Synchronize external HTML DOM match XP bar & Turn Badge elements
     let turnBadgeEl = document.getElementById('external-turn-badge');
     if (turnBadgeEl) {
         let turnText = `● TURN: ${currentTurn.toUpperCase()}`;
@@ -25,63 +63,25 @@ function drawTeamUIAndFlags() {
         xpFillEl.style.width = `${progressRatio}%`;
     }
 
-    // Modern Glassmorphism Game Over Card
+    // Independent DOM-based Game Over / Victory Modal Toggle
+    initGameOverDOMOverlay();
+    let gameOverModal = document.getElementById('gameOverModalOverlay');
+    let gameOverText = document.getElementById('gameOverMessageText');
+
     if (gameOver) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(18, 18, 18, 0.75)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (gameOverModal && gameOverText) {
+            gameOverModal.style.display = 'block';
+            gameOverText.innerText = winnerMessage;
 
-        let cardW = Math.min(canvas.width * 0.88, 460);
-        let cardH = 160;
-        let cardX = (canvas.width - cardW) / 2;
-        let cardY = (canvas.height - cardH) / 2;
-        let cardRadius = 16;
-
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        ctx.shadowBlur = 35;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 15;
-
-        ctx.fillStyle = 'rgba(18, 18, 18, 0.92)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = 1.5;
-
-        ctx.beginPath();
-        ctx.moveTo(cardX + cardRadius, cardY);
-        ctx.lineTo(cardX + cardW - cardRadius, cardY);
-        ctx.quadraticCurveTo(cardX + cardW, cardY, cardX + cardW, cardY + cardRadius);
-        ctx.lineTo(cardX + cardW, cardY + cardH - cardRadius);
-        ctx.quadraticCurveTo(cardX + cardW, cardY + cardH, cardX + cardW - cardRadius, cardY + cardH);
-        ctx.lineTo(cardX + cardRadius, cardY + cardH);
-        ctx.quadraticCurveTo(cardX, cardY + cardH, cardX, cardY + cardH - cardRadius);
-        ctx.lineTo(cardX, cardY + cardRadius);
-        ctx.quadraticCurveTo(cardX, cardY, cardX + cardRadius, cardY);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-
-        ctx.save();
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        ctx.fillStyle = '#b0b0b0';
-        ctx.font = 'bold 11px "Poppins", "Segoe UI", sans-serif';
-        ctx.fillText("MISSION STATUS: COMPLETED", canvas.width / 2, cardY + 36);
-
-        let isBlueWin = winnerMessage.includes('BLUE');
-        let isRedWin = winnerMessage.includes('RED');
-        ctx.fillStyle = isBlueWin ? '#38bdf8' : (isRedWin ? '#f87171' : '#fbbf24');
-        
-        ctx.font = 'bold 14px "Poppins", "Segoe UI", sans-serif';
-        ctx.fillText(winnerMessage, canvas.width / 2, cardY + 82);
-
-        ctx.fillStyle = '#8c8c8c';
-        ctx.font = '11px "Poppins", "Segoe UI", sans-serif';
-        ctx.fillText("🔄 Reloading next tactical deployment...", canvas.width / 2, cardY + 124);
-        
-        ctx.restore();
+            let isBlueWin = winnerMessage.includes('BLUE');
+            let isRedWin = winnerMessage.includes('RED');
+            gameOverText.style.color = isBlueWin ? '#38bdf8' : (isRedWin ? '#f87171' : '#fbbf24');
+        }
         return;
+    } else {
+        if (gameOverModal) {
+            gameOverModal.style.display = 'none';
+        }
     }
 
     // Bot Path Overlay
@@ -156,6 +156,7 @@ function drawTeamUIAndFlags() {
             
             if (su.units.length <= 1 && su.power !== Infinity && !su.isSpecialSuperunit && !isStalocked) return;
 
+            // Use grid-safe coordinate fallbacks to ensure red units are never skipped or treated as invisible
             let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
             let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
 
