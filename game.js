@@ -1,14 +1,17 @@
 // =========================================================================
 // CAMPAIGN, ACCOUNT RANK, & CACHE CONTROLLER (game.js)
-// Unlocked Test Mode: All levels selectable + Avatar, Faction, & Rank Integration
+// Independent Project Version (Standard Script Compatible)
 // =========================================================================
 
 const cachedUser = localStorage.getItem('arena_chess_user') || 'GuestPlayer';
 let currentCampaignLevel = parseInt(localStorage.getItem(`chess_campaign_level_${cachedUser}`)) || 1;
-let totalUserXp = parseInt(localStorage.getItem(`chess_campaign_xp_${cachedUser}`)) || 0;
+
+// Pull XP directly from the tactical game engine's shared localStorage cache
+let totalUserXp = parseInt(localStorage.getItem(`arena_chess_xp_${cachedUser}`)) || parseInt(localStorage.getItem(`chess_campaign_xp_${cachedUser}`)) || 0;
+
 let userAvatar = localStorage.getItem(`chess_campaign_avatar_${cachedUser}`) || localStorage.getItem('arena_chess_avatar') || '😀';
-let userFaction = localStorage.getItem('arena_chess_faction') || 'Order';
-let userRank = localStorage.getItem('arena_chess_rank') || 'Trainee ⭐';
+let userFaction = localStorage.getItem(`chess_campaign_faction_${cachedUser}`) || localStorage.getItem('arena_chess_faction') || 'Order';
+let userRank = localStorage.getItem(`chess_chess_rank_${cachedUser}`) || localStorage.getItem('arena_chess_rank') || 'Trainee ⭐';
 
 console.log(`[INFO][game.js] Logged into account: ${cachedUser} | Level: ${currentCampaignLevel} | Total Account XP: ${totalUserXp} | Faction: ${userFaction} | Rank: ${userRank}`);
 
@@ -35,8 +38,6 @@ function injectCampaignUI() {
 
     const shopBtn = document.getElementById('shop-btn');
     if (shopBtn) shopBtn.style.display = 'none';
-
-    let currentRankObj = getPlayerRank(totalUserXp);
 
     let campaignHud = document.getElementById('campaignHudContainer');
     if (!campaignHud) {
@@ -69,7 +70,6 @@ function injectCampaignUI() {
         document.getElementById('openAccountModalBtn').addEventListener('click', toggleAccountModal);
     }
 
-    // Hidden file input for direct profile avatar uploading
     let fileInput = document.getElementById('globalGameAvatarUpload');
     if (!fileInput) {
         fileInput = document.createElement('input');
@@ -202,18 +202,21 @@ function renderLevelSelectContent() {
         <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-height: 220px; overflow-y: auto; margin-bottom: 16px; padding: 4px;">
     `;
 
-    campaignLevels.forEach(lvl => {
-        let isCurrent = lvl.level === currentCampaignLevel;
-        let bgColor = isCurrent ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'linear-gradient(135deg, #10b981, #059669)';
-        let borderStyle = isCurrent ? '2px solid #93c5fd' : '1px solid rgba(255,255,255,0.1)';
+    // Ensure campaignLevels exists before looping to prevent runtime errors
+    if (typeof campaignLevels !== 'undefined' && Array.isArray(campaignLevels)) {
+        campaignLevels.forEach(lvl => {
+            let isCurrent = lvl.level === currentCampaignLevel;
+            let bgColor = isCurrent ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'linear-gradient(135deg, #10b981, #059669)';
+            let borderStyle = isCurrent ? '2px solid #93c5fd' : '1px solid rgba(255,255,255,0.1)';
 
-        html += `
-            <button onclick="window.loadCampaignLevel(${lvl.level})" style="
-                background: ${bgColor}; color: white; border: ${borderStyle}; padding: 10px 0; border-radius: 8px;
-                font-weight: 800; font-size: 11px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            ">${getStageDisplayLabel(lvl.level)}</button>
-        `;
-    });
+            html += `
+                <button onclick="window.loadCampaignLevel(${lvl.level})" style="
+                    background: ${bgColor}; color: white; border: ${borderStyle}; padding: 10px 0; border-radius: 8px;
+                    font-weight: 800; font-size: 11px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                ">${getStageDisplayLabel(lvl.level)}</button>
+            `;
+        });
+    }
 
     html += `
         </div>
@@ -221,3 +224,9 @@ function renderLevelSelectContent() {
     `;
     modal.innerHTML = html;
 }
+
+// Explicitly attach functions to window scope to fix reference errors from gamelogic.js
+window.injectCampaignUI = injectCampaignUI;
+window.triggerGameAvatarPicker = triggerGameAvatarPicker;
+window.toggleAccountModal = toggleAccountModal;
+window.toggleLevelSelectModal = toggleLevelSelectModal;
