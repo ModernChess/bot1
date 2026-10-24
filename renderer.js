@@ -6,9 +6,32 @@ const RendererLog = {
     success: (msg) => console.log(`[SUCCESS][renderer]: ${msg}`)
 };
 
-// Initialize independent HTML DOM Game Over Overlay
+// State trackers for the 5-second match end wait
+let matchEndTimerStarted = false;
+let matchEndCountdown = 5;
+let matchEndIntervalRef = null;
+
+// Initialize independent HTML DOM Game Over Overlay with Blur and Loading Button
 function initGameOverDOMOverlay() {
     if (document.getElementById('gameOverModalOverlay')) return;
+    
+    // Create full-screen general background blur container
+    const backdropBlur = document.createElement('div');
+    backdropBlur.id = 'matchEndBlurBackdrop';
+    backdropBlur.style.cssText = `
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        background: rgba(0, 0, 0, 0.55);
+        z-index: 999998;
+    `;
+    document.body.appendChild(backdropBlur);
+
     const overlay = document.createElement('div');
     overlay.id = 'gameOverModalOverlay';
     overlay.style.cssText = `
@@ -34,9 +57,22 @@ function initGameOverDOMOverlay() {
     overlay.innerHTML = `
         <div style="font-size: 11px; font-weight: bold; color: #b0b0b0; letter-spacing: 1px; margin-bottom: 8px;">MISSION STATUS: COMPLETED</div>
         <div id="gameOverMessageText" style="font-size: 14px; font-weight: bold; margin-bottom: 16px; text-shadow: 0 2px 4px rgba(0,0,0,0.6);"></div>
-        <div style="font-size: 11px; color: #8c8c8c;">🔄 Reloading next tactical deployment...</div>
+        
+        <!-- Loading Button with Spinner -->
+        <div id="matchEndLoadingContainer" style="display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(59, 130, 246, 0.25); border: 1px solid rgba(59, 130, 246, 0.5); padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+            <div style="width: 14px; height: 14px; border: 2px solid #38bdf8; border-top: 2px solid transparent; border-radius: 50%; animation: spinLoader 0.8s linear infinite;"></div>
+            <span id="matchEndLoadingText" style="font-size: 11px; font-weight: 800; color: #38bdf8;">Loading next deployment in 5s...</span>
+        </div>
     `;
     document.body.appendChild(overlay);
+
+    // Inject spinner keyframes style if not present
+    if (!document.getElementById('spinnerKeyframes')) {
+        const style = document.createElement('style');
+        style.id = 'spinnerKeyframes';
+        style.innerHTML = `@keyframes spinLoader { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+        document.head.appendChild(style);
+    }
 }
 
 window.addEventListener('load', () => {
@@ -63,12 +99,15 @@ function drawTeamUIAndFlags() {
         xpFillEl.style.width = `${progressRatio}%`;
     }
 
-    // Independent DOM-based Game Over / Victory Modal Toggle
+    // Independent DOM-based Game Over / Victory Modal Toggle with 5-Second Wait & Blur Backdrop
     initGameOverDOMOverlay();
+    let blurBackdrop = document.getElementById('matchEndBlurBackdrop');
     let gameOverModal = document.getElementById('gameOverModalOverlay');
     let gameOverText = document.getElementById('gameOverMessageText');
+    let loadingTextEl = document.getElementById('matchEndLoadingText');
 
     if (gameOver) {
+        if (blurBackdrop) blurBackdrop.style.display = 'block';
         if (gameOverModal && gameOverText) {
             gameOverModal.style.display = 'block';
             gameOverText.innerText = winnerMessage;
@@ -76,9 +115,35 @@ function drawTeamUIAndFlags() {
             let isBlueWin = winnerMessage.includes('BLUE');
             let isRedWin = winnerMessage.includes('RED');
             gameOverText.style.color = isBlueWin ? '#38bdf8' : (isRedWin ? '#f87171' : '#fbbf24');
+
+            // Trigger the 5-second countdown timer once per match end
+            if (!matchEndTimerStarted) {
+                matchEndTimerStarted = true;
+                matchEndCountdown = 5;
+                if (loadingTextEl) loadingTextEl.innerText = `Loading next deployment in ${matchEndCountdown}s...`;
+
+                if (matchEndIntervalRef) clearInterval(matchEndIntervalRef);
+                matchEndIntervalRef = setInterval(() => {
+                    matchEndCountdown--;
+                    if (matchEndCountdown > 0) {
+                        if (loadingTextEl) loadingTextEl.innerText = `Loading next deployment in ${matchEndCountdown}s...`;
+                    } else {
+                        clearInterval(matchEndIntervalRef);
+                        matchEndIntervalRef = null;
+                        if (loadingTextEl) loadingTextEl.innerText = `Deployment reloading...`;
+                    }
+                }, 1000);
+            }
         }
         return;
     } else {
+        // Reset state when game restarts or continues
+        matchEndTimerStarted = false;
+        if (matchEndIntervalRef) {
+            clearInterval(matchEndIntervalRef);
+            matchEndIntervalRef = null;
+        }
+        if (blurBackdrop) blurBackdrop.style.display = 'none';
         if (gameOverModal) {
             gameOverModal.style.display = 'none';
         }
