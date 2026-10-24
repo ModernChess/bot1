@@ -7,6 +7,7 @@ import { getGridCoordinatesFromClient } from './game-input.js';
 
 let selectedUnit = null;     
 let legalMoves = [];         
+let pendingMoveDestination = null; // Two-step confirmation target tile
 let rangeMode = false;
 let rangeSquares = [];
 
@@ -71,6 +72,41 @@ function getUnitCombatRange(unit) {
     return results;
 }
 
+// Check adjacent connections (enemy or friendly) for tile highlighting
+function getTileConnectionStatus(c, r, movingUnit) {
+    if (!movingUnit) return 'neutral';
+
+    let movingTeam = getTeamFromUnit(movingUnit);
+    let directions = [
+        {dx: 0, dy: -1}, {dx: 0, dy: 1},
+        {dx: -1, dy: 0}, {dx: 1, dy: 0},
+        {dx: -1, dy: -1}, {dx: 1, dy: -1},
+        {dx: -1, dy: 1}, {dx: 1, dy: 1}
+    ];
+
+    let connectsWithEnemy = false;
+    let connectsWithFriendly = false;
+
+    directions.forEach(dir => {
+        let nc = c + dir.dx;
+        let nr = r + dir.dy;
+
+        let adjacentUnit = units.find(u => u !== movingUnit && u.gridX === nc && u.gridY === nr && !u.invisible);
+        if (adjacentUnit) {
+            let adjTeam = getTeamFromUnit(adjacentUnit);
+            if (adjTeam && adjTeam !== movingTeam) {
+                connectsWithEnemy = true;
+            } else if (adjTeam === movingTeam) {
+                connectsWithFriendly = true;
+            }
+        }
+    });
+
+    if (connectsWithEnemy) return 'enemy';
+    if (connectsWithFriendly) return 'friendly';
+    return 'neutral';
+}
+
 function getLegalMoves(unit) {
     if (!unit) return [];
 
@@ -107,7 +143,9 @@ function getLegalMoves(unit) {
                 if (unit.type === 'water' && isWater) validTerrain = true;
 
                 if (!validTerrain) break;
-                moves.push({c: nc, r: nr});
+                
+                let connStatus = getTileConnectionStatus(nc, nr, unit);
+                moves.push({c: nc, r: nr, connection: connStatus});
             } else {
                 break;
             }
@@ -202,7 +240,7 @@ function tryMoveUnit(unit, newC, newR) {
     return true;
 }
 
-// Precise input mapping with instant tap selection (no delay)
+// Input mapping with two-step move confirmation
 canvas.addEventListener('pointerdown', (e) => {
     if (typeof currentTurn !== 'undefined' && currentTurn === 'red') {
         SystemLog.warn('Input ignored: It is currently Red bot turn. Human control is locked.');
@@ -224,15 +262,20 @@ canvas.addEventListener('pointerdown', (e) => {
         if (selectedUnit && !rangeMode) {
             let matchedLegalMove = legalMoves.find(m => m.c === c && m.r === r);
             if (matchedLegalMove) {
-                let success = tryMoveUnit(selectedUnit, c, r);
-                if (success) {
-                    selectedUnit = null;
-                    legalMoves = [];
+                if (pendingMoveDestination && pendingMoveDestination.c === c && pendingMoveDestination.r === r) {
+                    let success = tryMoveUnit(selectedUnit, c, r);
+                    if (success) {
+                        selectedUnit = null;
+                        legalMoves = [];
+                        pendingMoveDestination = null;
 
-                    if (typeof currentTurn !== 'undefined') {
-                        currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
-                        SystemLog.success(`Instant move complete. Turn switched to: ${currentTurn}`);
+                        if (typeof currentTurn !== 'undefined') {
+                            currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
+                            SystemLog.success(`Move complete. Turn switched to: ${currentTurn}`);
+                        }
                     }
+                } else {
+                    pendingMoveDestination = matchedLegalMove;
                 }
                 return;
             }
@@ -258,6 +301,7 @@ canvas.addEventListener('pointerdown', (e) => {
                         selectedUnit = null;
                         rangeMode = false;
                         rangeSquares = [];
+                        pendingMoveDestination = null;
                         return;
                     }
                 }
@@ -268,9 +312,9 @@ canvas.addEventListener('pointerdown', (e) => {
                 return; 
             }
 
-            // Instant selection on tap without delay
             selectedUnit = clickedUnit;
             legalMoves = getLegalMoves(clickedUnit);
+            pendingMoveDestination = null;
             rangeMode = false; 
 
             if (typeof window.triggerSelectSound === 'function') {
@@ -292,6 +336,7 @@ canvas.addEventListener('pointerdown', (e) => {
             if (!rangeMode) {
                 selectedUnit = null;
                 legalMoves = [];
+                pendingMoveDestination = null;
             }
         }
     }
@@ -361,15 +406,36 @@ function update() {
                 let cy = m.r * cellSize + cellSize / 2;
 
                 ctx.save();
-                ctx.fillStyle = 'rgba(59, 130, 246, 0.45)';
-                ctx.strokeStyle = 'rgba(147, 197, 253, 0.8)';
-                ctx.lineWidth = 2;
-                
+
+                // Dynamic tile colors: Red for enemy/combat, Bright Cyan for friendly connection, White for standard
+                if (m.connection === 'enemy') {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.75)'; // Red for combat/enemy connection
+                    ctx.strokeStyle = 'rgba(248, 113, 113, 0.95)';
+                } else if (m.connection === 'friendly') {
+                    ctx.fillStyle = 'rgba(6, 182, 212, 0.85)'; // Bright Cyan for friendly forces connection
+                    ctx.strokeStyle = 'rgba(34, 211, 238, 1.0)';
+                } else {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)'; // Standard dot color set to white
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                }
+
+                ctx.lineWidth = 2.5;
                 ctx.beginPath();
                 ctx.arc(cx, cy, cellSize * 0.28, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
                 ctx.restore();
+
+                // Confirming orange outline on movement tile when tapped once
+                if (pendingMoveDestination && pendingMoveDestination.c === m.c && pendingMoveDestination.r === m.r) {
+                    ctx.save();
+                    ctx.strokeStyle = '#f59e0b';
+                    ctx.lineWidth = 4;
+                    ctx.shadowColor = '#f59e0b';
+                    ctx.shadowBlur = 8;
+                    ctx.strokeRect(m.c * cellSize + 2, m.r * cellSize + 2, cellSize - 4, cellSize - 4);
+                    ctx.restore();
+                }
             });
 
             ctx.strokeStyle = '#38bdf8';
@@ -401,6 +467,36 @@ function update() {
             let unitSize = cellSize * 1.3;
             if (typeof u.facing === 'undefined') u.facing = 0;
             drawRotatedUnit(ctx, u.img, u.renderX, u.renderY, unitSize, u.facing);
+
+            let unitTeam = typeof getTeamFromUnit === 'function' ? getTeamFromUnit(u) : u.team;
+            if (unitTeam === 'blue') {
+                ctx.save();
+                ctx.lineWidth = 3.5;
+                let expandSize = 8;
+                let rx = u.renderX - expandSize / 2;
+                let ry = u.renderY - expandSize / 2;
+                let rSize = cellSize + expandSize;
+                let cornerRadius = 8;
+
+                if (typeof currentTurn !== 'undefined' && currentTurn === 'blue') {
+                    ctx.strokeStyle = '#10b981';
+                    ctx.shadowColor = '#10b981';
+                    ctx.shadowBlur = 8;
+                } else {
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 8;
+                }
+
+                if (typeof ctx.roundRect === 'function') {
+                    ctx.beginPath();
+                    ctx.roundRect(rx, ry, rSize, rSize, cornerRadius);
+                    ctx.stroke();
+                } else {
+                    ctx.strokeRect(rx, ry, rSize, rSize);
+                }
+                ctx.restore();
+            }
         }
     });
 
@@ -448,5 +544,5 @@ function update() {
 window.getLegalMoves = getLegalMoves;
 window.tryMoveUnit = tryMoveUnit;
 
-SystemLog.info('Unit movement controller updated with instant tap selection and camera coordinate translation.');
+SystemLog.info('Unit movement controller updated with white standard legal move dots.');
 update();
