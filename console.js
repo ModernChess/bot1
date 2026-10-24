@@ -3,6 +3,12 @@
 // =========================================================================
 
 (function() {
+    // Check if the currently logged-in user is Testaccount3
+    const cachedUser = localStorage.getItem('arena_chess_user') || 'GuestPlayer';
+    if (cachedUser !== 'Testaccount3') {
+        return; // Exit immediately if it's not Testaccount3, preventing the console from appearing
+    }
+
     // Create container elements for the in-game console and make it visible by default
     const consoleContainer = document.createElement('div');
     consoleContainer.id = 'ingame-debug-console';
