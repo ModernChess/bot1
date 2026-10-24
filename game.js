@@ -43,26 +43,35 @@ function injectCampaignUI() {
     if (!campaignHud) {
         campaignHud = document.createElement('div');
         campaignHud.id = 'campaignHudContainer';
-        campaignHud.style.cssText = `display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; color: #ffffff; ${sharedTextShadow}`;
+        campaignHud.style.cssText = `
+            display: flex; 
+            align-items: center; 
+            gap: 4px; 
+            font-size: 10px; 
+            font-weight: 700; 
+            color: #ffffff; 
+            flex-wrap: wrap; 
+            ${sharedTextShadow}
+        `;
         
         const avatarHTML = (userAvatar && (userAvatar.startsWith('data:image/') || userAvatar.startsWith('http')))
-            ? `<img src="${userAvatar}" style="width: 22px; height: 22px; min-width: 22px; min-height: 22px; aspect-ratio: 1 / 1; border-radius: 50%; object-fit: cover; vertical-align: middle;">`
-            : `<span style="font-size: 1.1rem; vertical-align: middle;">${userAvatar}</span>`;
+            ? `<img src="${userAvatar}" style="width: 20px; height: 20px; min-width: 20px; min-height: 20px; aspect-ratio: 1 / 1; border-radius: 50%; object-fit: cover; vertical-align: middle;">`
+            : `<span style="font-size: 1rem; vertical-align: middle;">${userAvatar}</span>`;
 
         const factionColor = userFaction === 'Order' ? '#00cec9' : '#ff7675';
 
         campaignHud.innerHTML = `
-            <div id="openAccountModalBtn" style="display: flex; align-items: center; gap: 6px; background: rgba(139, 92, 246, 0.25); border: 1px solid rgba(139, 92, 246, 0.5); padding: 4px 10px; border-radius: 8px; cursor: pointer;" title="View Profile">
-                <div id="hudAvatarContainer" style="width: 22px; height: 22px; min-width: 22px; min-height: 22px; aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+            <div id="openAccountModalBtn" style="display: flex; align-items: center; gap: 4px; background: rgba(139, 92, 246, 0.25); border: 1px solid rgba(139, 92, 246, 0.5); padding: 3px 8px; border-radius: 6px; cursor: pointer;" title="View Profile">
+                <div id="hudAvatarContainer" style="width: 20px; height: 20px; min-width: 20px; min-height: 20px; aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
                     ${avatarHTML}
                 </div>
                 <span style="color: #c084fc;">${cachedUser}</span> 
-                <span style="color: ${factionColor}; font-size: 10px;">[${userFaction}]</span>
+                <span style="color: ${factionColor}; font-size: 9px;">[${userFaction}]</span>
             </div>
-            <div style="background: rgba(59, 130, 246, 0.25); border: 1px solid rgba(59, 130, 246, 0.5); padding: 5px 10px; border-radius: 8px;">
+            <div style="background: rgba(59, 130, 246, 0.25); border: 1px solid rgba(59, 130, 246, 0.5); padding: 4px 8px; border-radius: 6px;">
                 STAGE: <span id="hudLevelVal">T1</span> | XP: <span id="hudXpVal">${totalUserXp}</span>
             </div>
-            <button id="openLevelSelectBtn" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; border: none; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight: 800; font-size: 10px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">Levels</button>
+            <button id="openLevelSelectBtn" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-weight: 800; font-size: 10px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">Levels</button>
         `;
         topBar.appendChild(campaignHud);
 
@@ -87,8 +96,8 @@ function injectCampaignUI() {
         accModal.id = 'accountProfileModal';
         accModal.style.cssText = `
             display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            ${sharedGlassModalStyle} padding: 24px; border-radius: 20px;
-            width: 90%; max-width: 320px; z-index: 100; text-align: center; color: #fff;
+            ${sharedGlassModalStyle} padding: 20px; border-radius: 16px;
+            width: 90%; max-width: 310px; z-index: 100; text-align: center; color: #fff;
         `;
         document.body.appendChild(accModal);
     }
@@ -100,8 +109,8 @@ function injectCampaignUI() {
         modal.id = 'levelSelectModal';
         modal.style.cssText = `
             display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            ${sharedGlassModalStyle} padding: 24px; border-radius: 20px;
-            width: 90%; max-width: 380px; z-index: 100; text-align: center; color: #fff;
+            ${sharedGlassModalStyle} padding: 20px; border-radius: 16px;
+            width: 90%; max-width: 360px; z-index: 100; text-align: center; color: #fff;
         `;
         document.body.appendChild(modal);
     }
@@ -162,16 +171,16 @@ function renderAccountModalContent() {
         : `<span style="font-size: 28px;">${userAvatar}</span>`;
 
     modal.innerHTML = `
-        <h3 style="margin-top: 0; color: #3b82f6; text-transform: uppercase; font-size: 15px; font-weight: 800; ${sharedTextShadow}">Player Profile</h3>
+        <h3 style="margin-top: 0; color: #3b82f6; text-transform: uppercase; font-size: 14px; font-weight: 800; ${sharedTextShadow}">Player Profile</h3>
         
-        <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 14px;">
-            <div style="width: 64px; height: 64px; min-width: 64px; min-height: 64px; aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden; border: 2px solid #8b5cf6; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; margin-bottom: 8px; box-shadow: 0 4px 12px rgba(139,92,246,0.3);">
+        <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 12px;">
+            <div style="width: 56px; height: 56px; min-width: 56px; min-height: 56px; aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden; border: 2px solid #8b5cf6; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; margin-bottom: 6px; box-shadow: 0 4px 12px rgba(139,92,246,0.3);">
                 ${profileAvatarHTML}
             </div>
             <button onclick="triggerGameAvatarPicker()" style="background: rgba(139, 92, 246, 0.3); border: 1px solid rgba(139, 92, 246, 0.6); color: #c084fc; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; cursor: pointer;">📷 Change Avatar</button>
         </div>
 
-        <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); padding: 14px; border-radius: 12px; margin-bottom: 16px; text-align: left; font-size: 12px; line-height: 1.6; color: #ffffff; ${sharedTextShadow}">
+        <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px; border-radius: 10px; margin-bottom: 14px; text-align: left; font-size: 11px; line-height: 1.5; color: #ffffff; ${sharedTextShadow}">
             <div>👤 <strong>Username:</strong> <span style="color: #c084fc;">${cachedUser}</span></div>
             <div>🛡️ <strong>Faction:</strong> <span style="color: ${factionColor}; font-weight: bold;">${userFaction}</span></div>
             <div>⭐ <strong>Class Rank:</strong> <span style="color: #00cec9; font-weight: bold;">${userRank}</span></div>
@@ -179,7 +188,7 @@ function renderAccountModalContent() {
             <div>⚡ <strong>Total Account XP:</strong> ${totalUserXp} XP</div>
             <div>🎯 <strong>Current Stage:</strong> ${getStageDisplayLabel(currentCampaignLevel)}</div>
         </div>
-        <button onclick="toggleAccountModal()" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; width: 100%; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);">Close</button>
+        <button onclick="toggleAccountModal()" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; width: 100%; padding: 8px; border-radius: 8px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);">Close</button>
     `;
 }
 
@@ -197,9 +206,9 @@ function renderLevelSelectContent() {
     if (!modal) return;
 
     let html = `
-        <h3 style="margin-top: 0; color: #8b5cf6; text-transform: uppercase; font-size: 15px; font-weight: 800; ${sharedTextShadow}">Campaign & Tutorials (Test Mode)</h3>
-        <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 16px; ${sharedTextShadow}">Select any level to play freely:</p>
-        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-height: 220px; overflow-y: auto; margin-bottom: 16px; padding: 4px;">
+        <h3 style="margin-top: 0; color: #8b5cf6; text-transform: uppercase; font-size: 14px; font-weight: 800; ${sharedTextShadow}">Campaign & Tutorials (Test Mode)</h3>
+        <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 12px; ${sharedTextShadow}">Select any level to play freely:</p>
+        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-height: 180px; overflow-y: auto; margin-bottom: 14px; padding: 2px;">
     `;
 
     // Ensure campaignLevels exists before looping to prevent runtime errors
@@ -211,8 +220,8 @@ function renderLevelSelectContent() {
 
             html += `
                 <button onclick="window.loadCampaignLevel(${lvl.level})" style="
-                    background: ${bgColor}; color: white; border: ${borderStyle}; padding: 10px 0; border-radius: 8px;
-                    font-weight: 800; font-size: 11px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    background: ${bgColor}; color: white; border: ${borderStyle}; padding: 8px 0; border-radius: 6px;
+                    font-weight: 800; font-size: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                 ">${getStageDisplayLabel(lvl.level)}</button>
             `;
         });
@@ -220,13 +229,13 @@ function renderLevelSelectContent() {
 
     html += `
         </div>
-        <button onclick="toggleLevelSelectModal()" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; width: 100%; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);">Close</button>
+        <button onclick="toggleLevelSelectModal()" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; width: 100%; padding: 8px; border-radius: 8px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);">Close</button>
     `;
     modal.innerHTML = html;
 }
 
 // Explicitly attach functions to window scope to fix reference errors from gamelogic.js
 window.injectCampaignUI = injectCampaignUI;
-window.triggerGameAvatarPicker = triggerGameAvatarPicker;
+window.triggerGameAvatarPicker() = triggerGameAvatarPicker;
 window.toggleAccountModal = toggleAccountModal;
 window.toggleLevelSelectModal = toggleLevelSelectModal;
