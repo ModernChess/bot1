@@ -11,6 +11,11 @@ let pendingMoveDestination = null; // Two-step confirmation target tile
 let rangeMode = false;
 let rangeSquares = [];
 
+// Track pointer position to distinguish between a tap/click and map dragging/panning
+let pointerDownX = 0;
+let pointerDownY = 0;
+let hasDragged = false;
+
 const SystemLog = {
     info: (msg, data = null) => console.log(`[INFO][unit_movement]: ${msg}`, data ?? ''),
     warn: (msg, data = null) => console.warn(`[WARN][unit_movement]: ${msg}`, data ?? ''),
@@ -72,7 +77,6 @@ function getUnitCombatRange(unit) {
     return results;
 }
 
-// Check adjacent connections (enemy or friendly) for tile highlighting
 function getTileConnectionStatus(c, r, movingUnit) {
     if (!movingUnit) return 'neutral';
 
@@ -130,8 +134,6 @@ function getLegalMoves(unit) {
             let nr = cy + (dir.dy * step);
 
             if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) {
-                if (typeof isGoldCore === 'function' && isGoldCore(nc, nr)) break;
-
                 let isOccupied = units.some(u => u.gridX === nc && u.gridY === nr);
                 if (isOccupied) break;
 
@@ -201,8 +203,6 @@ function tryMoveUnit(unit, newC, newR) {
                             if (movingTeam === 'blue') {
                                 if (typeof window.rewardHumanCapture === 'function') {
                                     window.rewardHumanCapture();
-                                } else if (typeof rewardHumanCapture === 'function') {
-                                    rewardHumanCapture();
                                 }
                             }
                             SystemLog.success(`Gold core ${core.id} captured by ${movingTeam}!`);
@@ -215,8 +215,6 @@ function tryMoveUnit(unit, newC, newR) {
                         if (movingTeam === 'blue') {
                             if (typeof window.rewardHumanCapture === 'function') {
                                 window.rewardHumanCapture();
-                            } else if (typeof rewardHumanCapture === 'function') {
-                                rewardHumanCapture();
                             }
                         }
                         SystemLog.success(`Neutral gold core ${core.id} claimed by ${movingTeam}!`);
@@ -240,8 +238,85 @@ function tryMoveUnit(unit, newC, newR) {
     return true;
 }
 
-// Input mapping with two-step move confirmation
 canvas.addEventListener('pointerdown', (e) => {
+    if (e.isPrimary === false) return; // Allow multi-touch pinch-zoom
+    pointerDownX = e.clientX;
+    pointerDownY = e.clientY;
+    hasDragged = false;
+});
+
+canvas.addEventListener('pointermove', (e) => {
+    let moveDist = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
+    if (moveDist > 8) {
+        hasDragged = true; // User is panning/dragging the map
+    }
+});
+
+canvas.addEventListener('pointerup', (e) => {
+    // If user dragged/panned the map, do not treat it as a tap
+    if (hasDragged) return;
+
+    // Prevent selecting or moving any units if the game has ended / victory reached
+    if (typeof gameOver !== 'undefined' && gameOver) {
+        return;
+    }
+
+    // 1. Handle shop unit deployment click if pending
+    if (typeof pendingDeploymentType !== 'undefined' && pendingDeploymentType) {
+        const cam = getCameraState();
+        let gridCoord = getGridCoordinatesFromClient(e.clientX, e.clientY, canvas, cam.x, cam.y, cam.zoom, cols, rows);
+        
+        if (gridCoord) {
+            let c = gridCoord.col;
+            let r = gridCoord.row;
+            let isValidDeploy = false;
+
+            if (pendingDeploymentType === 'infantry') {
+                goldCores.forEach(gc => {
+                    if (gc.owner === 'blue') {
+                        if ((gc.c === c && gc.r === r) || (gc.captureZones && gc.captureZones.some(z => z.c === c && z.r === r))) {
+                            isValidDeploy = true;
+                        }
+                    }
+                });
+            } else if (pendingDeploymentType === 'tank') {
+                let baseSquares = typeof getBaseSquares === 'function' ? getBaseSquares('blue') : [];
+                if (baseSquares.some(b => b.c === c && b.r === r)) {
+                    isValidDeploy = true;
+                }
+            }
+
+            // If valid and unoccupied, deploy unit and hide deployment banner. If invalid, wait quietly.
+            if (isValidDeploy) {
+                let isOccupied = units.some(u => u.gridX === c && u.gridY === r);
+                if (!isOccupied) {
+                    let newAsset = pendingDeploymentType === 'infantry' ? {
+                        name: 'Infantry', type: 'land', range: 2, speed: 2, img: blueInfantryImg, loaded: () => blueInfantryLoaded
+                    } : {
+                        name: 'Tank', type: 'land', range: 3, speed: 3, img: blueTankImg, loaded: () => blueTankLoaded
+                    };
+
+                    units.push({
+                        name: newAsset.name, type: newAsset.type, range: newAsset.range,
+                        speed: newAsset.speed, gridX: c, gridY: r,
+                        x: c * cellSize, y: r * cellSize, img: newAsset.img, loaded: newAsset.loaded, team: 'blue', facing: 0
+                    });
+
+                    SystemLog.success(`Successfully deployed bought ${pendingDeploymentType} at (${c}, ${r})!`);
+                    pendingDeploymentType = null;
+                    
+                    if (typeof updateDeploymentPromptUI === 'function') {
+                        updateDeploymentPromptUI('', false);
+                    } else {
+                        let deployModal = document.getElementById('deploymentPromptModal');
+                        if (deployModal) deployModal.style.display = 'none';
+                    }
+                }
+            }
+            return; 
+        }
+    }
+
     if (typeof currentTurn !== 'undefined' && currentTurn === 'red') {
         SystemLog.warn('Input ignored: It is currently Red bot turn. Human control is locked.');
         return;
@@ -253,7 +328,6 @@ canvas.addEventListener('pointerdown', (e) => {
 
     let c = gridCoord.col;
     let r = gridCoord.row;
-
     let worldCoord = screenToWorldCoordinates(e.clientX, e.clientY, canvas);
 
     if (r >= 0 && r < rows && c >= 0 && c < cols) {
@@ -373,6 +447,39 @@ function update() {
         TutorialGuide.renderBattlefieldOverlays(ctx);
     }
 
+    // Highlight valid deployment tiles during active shop purchase deployment mode
+    if (typeof pendingDeploymentType !== 'undefined' && pendingDeploymentType) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.45)';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2.5;
+
+        if (pendingDeploymentType === 'infantry') {
+            goldCores.forEach(gc => {
+                if (gc.owner === 'blue') {
+                    let tilesToCheck = [{c: gc.c, r: gc.r}, ...(gc.captureZones || [])];
+                    tilesToCheck.forEach(t => {
+                        let isOccupied = units.some(u => u.gridX === t.c && u.gridY === t.r);
+                        if (!isOccupied) {
+                            ctx.fillRect(t.c * cellSize + 2, t.r * cellSize + 2, cellSize - 4, cellSize - 4);
+                            ctx.strokeRect(t.c * cellSize + 2, t.r * cellSize + 2, cellSize - 4, cellSize - 4);
+                        }
+                    });
+                }
+            });
+        } else if (pendingDeploymentType === 'tank') {
+            let baseSquares = typeof getBaseSquares === 'function' ? getBaseSquares('blue') : [];
+            baseSquares.forEach(t => {
+                let isOccupied = units.some(u => u.gridX === t.c && u.gridY === t.r);
+                if (!isOccupied) {
+                    ctx.fillRect(t.c * cellSize + 2, t.r * cellSize + 2, cellSize - 4, cellSize - 4);
+                    ctx.strokeRect(t.c * cellSize + 2, t.r * cellSize + 2, cellSize - 4, cellSize - 4);
+                }
+            });
+        }
+        ctx.restore();
+    }
+
     units.forEach(u => {
         let targetX = u.gridX * cellSize;
         let targetY = u.gridY * cellSize;
@@ -389,7 +496,7 @@ function update() {
         ctx.fill();
     });
 
-    if (selectedUnit) {
+    if (selectedUnit && !(typeof gameOver !== 'undefined' && gameOver)) {
         if (rangeMode) {
             ctx.strokeStyle = '#ffffff'; 
             ctx.lineWidth = 3.5;
@@ -406,16 +513,14 @@ function update() {
                 let cy = m.r * cellSize + cellSize / 2;
 
                 ctx.save();
-
-                // Dynamic tile colors: Red for enemy/combat, Bright Cyan for friendly connection, White for standard
                 if (m.connection === 'enemy') {
-                    ctx.fillStyle = 'rgba(239, 68, 68, 0.75)'; // Red for combat/enemy connection
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.75)';
                     ctx.strokeStyle = 'rgba(248, 113, 113, 0.95)';
                 } else if (m.connection === 'friendly') {
-                    ctx.fillStyle = 'rgba(6, 182, 212, 0.85)'; // Bright Cyan for friendly forces connection
+                    ctx.fillStyle = 'rgba(6, 182, 212, 0.85)';
                     ctx.strokeStyle = 'rgba(34, 211, 238, 1.0)';
                 } else {
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)'; // Standard dot color set to white
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
                 }
 
@@ -426,7 +531,6 @@ function update() {
                 ctx.stroke();
                 ctx.restore();
 
-                // Confirming orange outline on movement tile when tapped once
                 if (pendingMoveDestination && pendingMoveDestination.c === m.c && pendingMoveDestination.r === m.r) {
                     ctx.save();
                     ctx.strokeStyle = '#f59e0b';
@@ -442,22 +546,6 @@ function update() {
             ctx.lineWidth = 3;
             ctx.strokeRect(selectedUnit.renderX + 3, selectedUnit.renderY + 3, cellSize - 6, cellSize - 6);
         }
-
-        if ((selectedUnit.name || '').includes('Ship') || (selectedUnit.name || '').includes('Artillery')) {
-            let btnX = selectedUnit.renderX + cellSize + 12;
-            let btnY = selectedUnit.renderY - 12;
-            let btnSize = cellSize * 0.85;
-            
-            ctx.fillStyle = rangeMode ? '#c0392b' : '#e74c3c';
-            ctx.fillRect(btnX, btnY, btnSize, btnSize);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(btnX, btnY, btnSize, btnSize);
-
-            ctx.beginPath();
-            ctx.arc(btnX + btnSize / 2, btnY + btnSize / 2, btnSize * 0.25, 0, Math.PI * 2);
-            ctx.stroke();
-        }
     }
 
     units.forEach(u => {
@@ -469,7 +557,7 @@ function update() {
             drawRotatedUnit(ctx, u.img, u.renderX, u.renderY, unitSize, u.facing);
 
             let unitTeam = typeof getTeamFromUnit === 'function' ? getTeamFromUnit(u) : u.team;
-            if (unitTeam === 'blue') {
+            if (unitTeam === 'blue' && !(typeof gameOver !== 'undefined' && gameOver)) {
                 ctx.save();
                 ctx.lineWidth = 3.5;
                 let expandSize = 8;
@@ -500,38 +588,41 @@ function update() {
         }
     });
 
+    // Render and update unit destruction particle / halo effects
     if (typeof unitDestructionEffects !== 'undefined' && unitDestructionEffects.length > 0) {
         ctx.save();
-        let now = performance.now();
-
+        let nowTime = performance.now();
         for (let i = unitDestructionEffects.length - 1; i >= 0; i--) {
             let fx = unitDestructionEffects[i];
-            let elapsed = now - fx.startTime;
+            let elapsed = nowTime - fx.startTime;
+            let progress = elapsed / fx.duration;
 
-            if (elapsed < fx.duration) {
-                let progress = elapsed / fx.duration;
-                let alpha = 1 - progress;
-
-                ctx.beginPath();
-                ctx.arc(fx.x, fx.y, progress * (cellSize * 0.9), 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(245, 158, 11, ${alpha * 0.8})`;
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-
-                fx.particles.forEach(p => {
-                    p.x += p.vx;
-                    p.y += p.vy;
-
-                    ctx.fillStyle = p.color;
-                    ctx.globalAlpha = alpha;
-                    ctx.beginPath();
-                    ctx.arc(fx.x + p.x, fx.y + p.y, p.radius, 0, Math.PI * 2);
-                    ctx.fill();
-                });
-                ctx.globalAlpha = 1.0;
-            } else {
+            if (progress >= 1) {
                 unitDestructionEffects.splice(i, 1);
+                continue;
             }
+
+            // Draw expanding halo ring
+            let currentRadius = (cellSize * 0.8) * (0.2 + progress * 1.2);
+            let alpha = 1 - progress;
+
+            ctx.beginPath();
+            ctx.arc(fx.x, fx.y, currentRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(245, 158, 11, ${alpha})`;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Draw burst particles
+            fx.particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                ctx.beginPath();
+                ctx.arc(fx.x + p.x, fx.y + p.y, p.radius * (1 - progress * 0.5), 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = alpha;
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
         }
         ctx.restore();
     }
@@ -540,9 +631,8 @@ function update() {
     requestAnimationFrame(update);
 }
 
-// Expose module functions globally so classic scripts like red_bot.js can access them
 window.getLegalMoves = getLegalMoves;
 window.tryMoveUnit = tryMoveUnit;
 
-SystemLog.info('Unit movement controller updated with white standard legal move dots.');
+SystemLog.info('Unit movement controller updated with destruction visual effects and non-selectable units during game over.');
 update();
