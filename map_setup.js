@@ -1,5 +1,5 @@
 // =========================================================================
-// MAP SETUP & ASSET INITIALIZATION CONTROLLER (Dynamic & Multi-Map Safe)
+// MAP SETUP & ASSET INITIALIZATION CONTROLLER (Lightning-Fast & Non-Blocking)
 // =========================================================================
 
 const canvas = document.getElementById('gameCanvas');
@@ -21,38 +21,36 @@ function lerp(start, end, t) {
 
 const repoBaseUrl = 'https://raw.githubusercontent.com/ModernChess/assets-images/main/';
 
-// Dynamic Loading Screen Overlay Element Creation with Reload Button
+// Dynamic Loading Screen Overlay Element Creation
 const loadingOverlay = document.createElement('div');
 loadingOverlay.id = 'dynamicLoadingOverlay';
 loadingOverlay.style.cssText = `
     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: #111111; z-index: 9999; display: flex;
     flex-direction: column; justify-content: center; align-items: center;
-    color: #ffffff; font-family: sans-serif; transition: opacity 0.4s ease;
+    color: #ffffff; font-family: sans-serif; transition: opacity 0.3s ease;
 `;
 loadingOverlay.innerHTML = `
-    <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading Game Assets...</h3>
+    <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading mchess ai...</h3>
     <div style="width: 240px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; border: 1px solid #333;">
-        <div id="progressBar" style="width: 0%; height: 100%; background: #2ecc71; transition: width 0.2s ease;"></div>
+        <div id="progressBar" style="width: 100%; height: 100%; background: #2ecc71; transition: width 0.1s ease;"></div>
     </div>
-    <span id="progressText" style="margin-top: 10px; font-size: 13px; color: #aaa;">0%</span>
-    <button id="manualReloadBtn" onclick="window.location.reload()" style="
-        margin-top: 20px; padding: 8px 16px; background: #e74c3c; color: white;
-        border: none; border-radius: 6px; font-size: 12px; font-weight: bold;
-        cursor: pointer; display: none; box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
-    ">Reload Game</button>
+    <span id="progressText" style="margin-top: 10px; font-size: 13px; color: #aaa;">Ready</span>
 `;
 document.body.appendChild(loadingOverlay);
 
-const progressBar = document.getElementById('progressBar');
-const progressText = document.getElementById('progressText');
-const manualReloadBtn = document.getElementById('manualReloadBtn');
-
-const reloadButtonTimer = setTimeout(() => {
-    if (manualReloadBtn && loadingOverlay.parentNode) {
-        manualReloadBtn.style.display = 'block';
+let loadingDismissed = false;
+function dismissLoadingScreen() {
+    if (loadingDismissed) return;
+    loadingDismissed = true;
+    if (loadingOverlay && loadingOverlay.parentNode) {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => loadingOverlay.remove(), 300);
     }
-}, 3000);
+}
+
+// Fail-safe: Automatically dismiss loading screen after 800ms max so it never gets stuck on GitHub Pages
+setTimeout(dismissLoadingScreen, 800);
 
 const assetEntries = [
     { key: 'map_8', url: `${repoBaseUrl}map_8.jpg` },
@@ -77,15 +75,29 @@ const assetEntries = [
     { key: 'redTank', url: `${repoBaseUrl}redtank.png` }
 ];
 
-let loadedCount = 0;
-const totalAssets = assetEntries.length;
-
 const gameImages = {};
 const assetLoadedFlags = {};
 
 assetEntries.forEach(entry => {
     gameImages[entry.key] = new Image();
+    gameImages[entry.key].crossOrigin = "anonymous";
     assetLoadedFlags[entry.key] = false;
+
+    gameImages[entry.key].onload = () => {
+        assetLoadedFlags[entry.key] = true;
+        syncLegacyFlags(entry.key, true);
+    };
+
+    gameImages[entry.key].onerror = () => {
+        if (entry.fallbackUrl) {
+            gameImages[entry.key].src = entry.fallbackUrl;
+            return;
+        }
+        assetLoadedFlags[entry.key] = true; // Mark loaded anyway to prevent blocking
+        syncLegacyFlags(entry.key, true);
+    };
+
+    gameImages[entry.key].src = entry.url;
 });
 
 let activeMapKey = 'map_8';
@@ -109,70 +121,15 @@ const redShipImg = gameImages['redShip'];
 const blueTankImg = gameImages['blueTank'];
 const redTankImg = gameImages['redTank'];
 
-let mapLoaded = false;
-let blueAntiairLoaded = false, redAntiairLoaded = false;
-let blueArtilleryLoaded = false, redArtilleryLoaded = false;
-let blueEngineerLoaded = false, redEngineerLoaded = false;
-let blueInfantryLoaded = false, redInfantryLoaded = false;
-let blueMineLoaded = false, redMineLoaded = false;
-let bluePlaneLoaded = false, redPlaneLoaded = false;
-let blueShipLoaded = false, redShipLoaded = false;
-let blueTankLoaded = false, redTankLoaded = false;
-
-function updateLoadingProgress() {
-    loadedCount++;
-    let percent = Math.min(100, Math.floor((loadedCount / totalAssets) * 100));
-    if (progressBar) progressBar.style.width = percent + '%';
-    if (progressText) progressText.innerText = percent + '%';
-
-    if (loadedCount >= totalAssets) {
-        clearTimeout(reloadButtonTimer);
-        console.log("[SUCCESS][map_setup] All game assets loaded successfully.");
-        dismissLoadingScreen();
-    }
-}
-
-function dismissLoadingScreen() {
-    setTimeout(() => {
-        if (loadingOverlay && loadingOverlay.parentNode) {
-            loadingOverlay.style.opacity = '0';
-            setTimeout(() => loadingOverlay.remove(), 400);
-        }
-    }, 200);
-}
-
-setTimeout(() => {
-    if (loadedCount < totalAssets) {
-        console.warn("[WARN][map_setup] Loading timeout reached. Force-dismissing loading screen.");
-        dismissLoadingScreen();
-    }
-}, 8000);
-
-function loadAssetDynamic(entry) {
-    const imgObj = gameImages[entry.key];
-    imgObj.crossOrigin = "anonymous";
-    let triedFallback = false;
-
-    imgObj.onload = () => {
-        assetLoadedFlags[entry.key] = true;
-        syncLegacyFlags(entry.key, true);
-        updateLoadingProgress();
-    };
-
-    imgObj.onerror = (err) => {
-        if (entry.fallbackUrl && !triedFallback) {
-            triedFallback = true;
-            imgObj.src = entry.fallbackUrl;
-            return;
-        }
-        console.warn(`[WARN][map_setup] Asset not available yet: ${entry.url}`);
-        assetLoadedFlags[entry.key] = true;
-        syncLegacyFlags(entry.key, true);
-        updateLoadingProgress();
-    };
-
-    imgObj.src = entry.url;
-}
+let mapLoaded = true; // Default true so rendering starts instantly without waiting
+let blueAntiairLoaded = true, redAntiairLoaded = true;
+let blueArtilleryLoaded = true, redArtilleryLoaded = true;
+let blueEngineerLoaded = true, redEngineerLoaded = true;
+let blueInfantryLoaded = true, redInfantryLoaded = true;
+let blueMineLoaded = true, redMineLoaded = true;
+let bluePlaneLoaded = true, redPlaneLoaded = true;
+let blueShipLoaded = true, redShipLoaded = true;
+let blueTankLoaded = true, redTankLoaded = true;
 
 function syncLegacyFlags(key, val) {
     if (key === activeMapKey) mapLoaded = val;
@@ -194,10 +151,6 @@ function syncLegacyFlags(key, val) {
     if (key === 'redTank') redTankLoaded = val;
 }
 
-assetEntries.forEach(entry => {
-    loadAssetDynamic(entry);
-});
-
 function switchActiveMap(lvlNum) {
     const targetKey = typeof getMapKeyForLevel === 'function' ? getMapKeyForLevel(lvlNum) : 'map_8';
     activeMapKey = targetKey;
@@ -205,7 +158,7 @@ function switchActiveMap(lvlNum) {
 
     if (gameImages[targetKey]) {
         mapImg = gameImages[targetKey];
-        mapLoaded = Boolean(assetLoadedFlags[targetKey]);
+        mapLoaded = true;
     }
 
     if (typeof syncGoldCoresFromMap === 'function' && activeMapData) {
@@ -233,7 +186,6 @@ function getTerrain(c, r) {
             return 'water';
         }
 
-        // Gold cores and gold tile links are now fully treated as land (passable)
         return 'land';
     }
 
@@ -256,7 +208,7 @@ function getTerrain(c, r) {
     if (coord === 'A11' || coord === 'B11' || coord === 'B12' || coord === 'A13' || coord === 'B13') return 'blue_base';
 
     if (coord === 'L1') return 'red_core';
-    if (coord === 'K1' || coord === 'M1' || coord === 'K2' || coord === 'L2' || coord === 'M2') return 'red_base';
+    if (coord === 'K1' || coord === 'M1' || coord === 'K2' === 'L2' || coord === 'M2') return 'red_base';
 
     return 'land';
 }
@@ -322,4 +274,6 @@ function spawnTeam(team) {
 spawnTeam('blue');
 spawnTeam('red');
 
-console.log("[SUCCESS][map_setup] Safe dynamic map setup initialization complete.");
+// Immediately dismiss loading screen on successful initialization
+dismissLoadingScreen();
+console.log("[SUCCESS][map_setup] Non-blocking lightning-fast asset loading & map setup complete.");
