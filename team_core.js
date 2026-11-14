@@ -12,22 +12,74 @@ let flagAnimations = {};
 let gameOver = false;
 let winnerMessage = '';
 
-// Global container to hold the Red bot's currently calculated path for visualization
 window.activeRedBotPath = [];
 
-// ALL gold cores (1 to 6) start NEUTRAL (owner: null), while gc7 and gc8 act as team base win-conditions.
-let goldCores = [
-    { id: 'gc1', c: 6, r: 4, owner: null, isBase: false, captureZones: [{c:6, r:3}, {c:6, r:5}, {c:5, r:4}, {c:7, r:4}, {c:5, r:3}, {c:5, r:5}, {c:7, r:3}, {c:7, r:5}] },
-    { id: 'gc2', c: 1, r: 5, owner: null, isBase: false, captureZones: [{c:1, r:4}, {c:1, r:6}, {c:0, r:5}, {c:2, r:5}, {c:0, r:4}, {c:0, r:6}, {c:2, r:4}, {c:2, r:6}] }, 
-    { id: 'gc3', c: 12, r: 7, owner: null, isBase: false, captureZones: [{c:12, r:6}, {c:12, r:8}, {c:11, r:7}, {c:13, r:7}, {c:11, r:6}, {c:11, r:8}, {c:13, r:6}, {c:13, r:8}] },
-    { id: 'gc4', c: 5, r: 14, owner: null, isBase: false, captureZones: [{c:5, r:13}, {c:5, r:15}, {c:4, r:14}, {c:6, r:14}, {c:4, r:13}, {c:4, r:15}, {c:6, r:13}, {c:6, r:15}] },
-    { id: 'gc5', c: 16, r: 12, owner: null, isBase: false, captureZones: [{c:16, r:11}, {c:16, r:13}, {c:15, r:12}, {c:17, r:12}, {c:15, r:11}, {c:15, r:13}, {c:17, r:11}, {c:17, r:13}] },
-    { id: 'gc6', c: 11, r: 16, owner: null, isBase: false, captureZones: [{c:11, r:15}, {c:11, r:17}, {c:10, r:16}, {c:12, r:16}, {c:10, r:15}, {c:10, r:17}, {c:12, r:15}, {c:12, r:17}] },
-    // gc7: Red Base Special Gold Core (placed at Red original base coordinate c:11, r:0 / L1)
-    { id: 'gc7', c: 11, r: 0, owner: 'red', isBase: true, teamBase: 'red', captureZones: [{c:11, r:1}, {c:10, r:0}, {c:12, r:0}, {c:10, r:1}, {c:12, r:1}] },
-    // gc8: Blue Base Special Gold Core (placed at Blue original base coordinate c:0, r:11 / A12)
-    { id: 'gc8', c: 0, r: 11, owner: 'blue', isBase: true, teamBase: 'blue', captureZones: [{c:0, r:10}, {c:0, r:12}, {c:1, r:11}, {c:1, r:10}, {c:1, r:12}] }
-];
+// Default goldCores (dynamically overwritten when maps switch via syncGoldCoresFromMap)
+let goldCores = [];
+
+function syncGoldCoresFromMap(mapData) {
+    if (!mapData) return;
+    const rebuiltCores = [];
+
+    if (Array.isArray(mapData.gold_core_links)) {
+        mapData.gold_core_links.forEach((gc, idx) => {
+            const corePos = parseCoordString(gc.coordinates);
+            const zones = (gc.linked_tiles || []).map(parseCoordString);
+            rebuiltCores.push({
+                id: gc.custom_name || `gc_${idx + 1}`,
+                c: corePos.c,
+                r: corePos.r,
+                owner: null,
+                isBase: false,
+                captureZones: zones
+            });
+        });
+    }
+
+    if (Array.isArray(mapData.hq)) {
+        const redCore = mapData.hq.find(h => h.type_name === 'rbc');
+        if (redCore) {
+            const rPos = parseCoordString(redCore.coordinates);
+            const rZones = mapData.hq
+                .filter(h => h.type_name === 'r')
+                .map(h => parseCoordString(h.coordinates));
+            rebuiltCores.push({
+                id: redCore.custom_name || 'rbc',
+                c: rPos.c,
+                r: rPos.r,
+                owner: 'red',
+                isBase: true,
+                teamBase: 'red',
+                captureZones: rZones
+            });
+        }
+
+        const blueCore = mapData.hq.find(h => h.type_name === 'bbc');
+        if (blueCore) {
+            const bPos = parseCoordString(blueCore.coordinates);
+            const bZones = mapData.hq
+                .filter(h => h.type_name === 'b')
+                .map(h => parseCoordString(h.coordinates));
+            rebuiltCores.push({
+                id: blueCore.custom_name || 'bbc',
+                c: bPos.c,
+                r: bPos.r,
+                owner: 'blue',
+                isBase: true,
+                teamBase: 'blue',
+                captureZones: bZones
+            });
+        }
+    }
+
+    goldCores.length = 0;
+    rebuiltCores.forEach(c => goldCores.push(c));
+    console.log(`[SUCCESS][team_core] Synced and freshly reset ${goldCores.length} cores/HQs for map '${mapData.key}'.`);
+}
+
+if (typeof activeMapData !== 'undefined' && activeMapData) {
+    syncGoldCoresFromMap(activeMapData);
+}
 
 const TeamLog = {
     info: (msg, data = null) => console.log(`[INFO][team_core]: ${msg}`, data ?? ''),
@@ -116,7 +168,17 @@ function getSuperunitsForTeam(teamName, allUnits) {
 
 window.rewardHumanCapture = function() {
     humanMatchXp += 35;
-    TeamLog.success(`Human captured a base/core! +35 Match XP Gained.`);
+    
+    // Gold is strictly temporary session state; never saved to localStorage or Firebase
+    if (typeof userGoldCoins !== 'undefined') {
+        userGoldCoins += 1;
+    }
+
+    TeamLog.success(`Human captured a base/core! +35 Match XP & +1 Temporary Gold Coin Gained.`);
+
+    if (typeof updateHudDisplay === 'function') {
+        updateHudDisplay();
+    }
 
     if (humanMatchXp >= humanXpMax) {
         humanMatchXp -= humanXpMax;
@@ -126,8 +188,10 @@ window.rewardHumanCapture = function() {
     }
 };
 
+let postGameTimerActive = false;
+
 function checkWinConditions(allUnits) {
-    if (gameOver) return;
+    if (gameOver || postGameTimerActive) return;
 
     let redLandUnits = allUnits.filter(u => getTeamFromUnit(u) === 'red' && !isSpecialUnit(u) && getUnitPower(u) !== Infinity);
     let blueLandUnits = allUnits.filter(u => getTeamFromUnit(u) === 'blue' && !isSpecialUnit(u) && getUnitPower(u) !== Infinity);
@@ -135,37 +199,33 @@ function checkWinConditions(allUnits) {
     let blueTotal = allUnits.filter(u => getTeamFromUnit(u) === 'blue');
 
     if (redLandUnits.length === 0 || redTotal.length === 0) {
-        gameOver = true;
         winnerMessage = 'BLUE TEAM WINS BY ANNIHILATION!';
         TeamLog.success(winnerMessage);
-        triggerPostGameReload();
+        triggerPostGameSequence();
         return;
     }
     if (blueLandUnits.length === 0 || blueTotal.length === 0) {
-        gameOver = true;
         winnerMessage = 'RED TEAM WINS BY ANNIHILATION!';
         TeamLog.success(winnerMessage);
-        triggerPostGameReload();
+        triggerPostGameSequence();
         return;
     }
 
     goldCores.forEach(core => {
         if (core.isBase && core.owner && core.teamBase) {
             if (core.owner !== core.teamBase) {
-                gameOver = true;
                 winnerMessage = `${core.owner.toUpperCase()} TEAM WINS BY CAPTURING ENEMY BASE!`;
                 TeamLog.success(winnerMessage);
-                triggerPostGameReload();
+                triggerPostGameSequence();
             }
         }
     });
 
-    if (gameOver) return;
+    if (gameOver || postGameTimerActive) return;
 
     let blueUnits = allUnits.filter(u => getTeamFromUnit(u) === 'blue');
     let redUnits = allUnits.filter(u => getTeamFromUnit(u) === 'red');
 
-    // FIXED: Strict combat stalemate check. Only triggers if units are explicitly locked in combat stalemate.
     let isTeamCompletelyStalmated = (teamUnits) => {
         if (teamUnits.length === 0) return false;
         return teamUnits.every(u => {
@@ -177,7 +237,6 @@ function checkWinConditions(allUnits) {
     let redStalmated = isTeamCompletelyStalmated(redUnits);
 
     if (blueStalmated || redStalmated) {
-        gameOver = true;
         if (blueUnits.length > redUnits.length) {
             winnerMessage = 'BLUE TEAM WINS BY GREATER NUMBER OF UNITS (RED STALEMATED)!';
         } else if (redUnits.length > blueUnits.length) {
@@ -186,13 +245,16 @@ function checkWinConditions(allUnits) {
             winnerMessage = 'STALEMATE DRAW! Equal units remaining.';
         }
         TeamLog.success(winnerMessage);
-        triggerPostGameReload();
+        triggerPostGameSequence();
     }
 }
 
-function triggerPostGameReload() {
-    console.log("[team_core] Game over reached. Processing account XP persistence & resetting match state...");
-    
+function triggerPostGameSequence() {
+    if (postGameTimerActive) return;
+    postGameTimerActive = true;
+
+    console.log("[team_core] Victory condition detected! Locking selection. Waiting 2.5 seconds before showing victory message...");
+
     let isHumanWinner = winnerMessage.includes('BLUE TEAM WINS') || winnerMessage.includes('BLUE TEAM WINS BY CAPTURING ENEMY BASE');
     
     if (isHumanWinner && typeof cachedUser !== 'undefined') {
@@ -217,35 +279,41 @@ function triggerPostGameReload() {
         if (typeof renderAccountModalContent === 'function') {
             renderAccountModalContent();
         }
-
-        console.log(`[SUCCESS][team_core] Saved ${earnedXpReward} XP to account ${cachedUser}! New Total XP: ${totalUserXp}`);
     }
 
-    humanMatchXp = 0;
-    humanLevel = 1;
-    humanXpMax = 100;
-
+    // Wait 2.5 seconds before triggering the victory popup message
     setTimeout(() => {
-        gameOver = false;
-        winnerMessage = '';
-        currentTurn = 'blue';
-        
-        goldCores.forEach(core => {
-            if (core.isBase && core.teamBase) {
-                core.owner = core.teamBase;
-            } else {
-                core.owner = null;
-            }
-        });
-        flagAnimations = {};
+        gameOver = true; 
+        console.log("[team_core] Victory message displayed. Advancing to next stage in 3 seconds...");
 
-        if (typeof currentCampaignLevel !== 'undefined' && typeof initLevelUnits === 'function') {
-            initLevelUnits(currentCampaignLevel);
-        } else if (typeof resetGameBoards === 'function') {
-            resetGameBoards();
-        }
-        console.log("[team_core] Board and capture tiles successfully reloaded for the next match!");
-    }, 3500);
+        // Wait 3 more seconds with the victory message showing, then load the next stage
+        setTimeout(() => {
+            humanMatchXp = 0;
+            humanLevel = 1;
+            humanXpMax = 100;
+            gameOver = false;
+            winnerMessage = '';
+            currentTurn = 'blue';
+            flagAnimations = {};
+            postGameTimerActive = false;
+
+            // Level advancement handled exclusively in gamelogic.js to prevent double-skipping
+
+            // Reset temporary gold to 2 upon advancing to next stage
+            if (typeof userGoldCoins !== 'undefined') {
+                userGoldCoins = 2;
+            }
+
+            if (typeof currentCampaignLevel !== 'undefined' && typeof initLevelUnits === 'function') {
+                initLevelUnits(currentCampaignLevel);
+            } else if (typeof activeMapData !== 'undefined' && activeMapData) {
+                syncGoldCoresFromMap(activeMapData);
+            }
+            updateHudDisplay();
+            console.log("[team_core] Successfully advanced to the next stage! Gold reset to 2.");
+        }, 3000);
+
+    }, 2500); // 2.5 seconds delay before victory message pops up
 }
 
 function commitUnitDestruction(unitsArray, unitsToDestroy) {
@@ -264,14 +332,4 @@ function commitUnitDestruction(unitsArray, unitsToDestroy) {
     });
 }
 
-function toggleShop() {
-    let modal = document.getElementById('shop-modal');
-    if (!modal) return;
-    modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
-}
-
-function buyUnit(unitType) {
-    TeamLog.info("Shop interaction disabled: Coins have been removed from the game.");
-}
-
-TeamLog.success("Team core logic controller successfully decoupled.");
+TeamLog.success("Team core logic controller successfully updated with temporary session gold and no persistence.");
