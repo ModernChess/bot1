@@ -1,5 +1,5 @@
 // =========================================================================
-// MAP SETUP & ASSET INITIALIZATION CONTROLLER (Optimized)
+// MAP SETUP & ASSET INITIALIZATION CONTROLLER (Dynamic & Multi-Map Safe)
 // =========================================================================
 
 const canvas = document.getElementById('gameCanvas');
@@ -21,13 +21,14 @@ function lerp(start, end, t) {
 
 const repoBaseUrl = 'https://raw.githubusercontent.com/ModernChess/assets-images/main/';
 
-// Dynamic Loading Screen Overlay Element Creation
+// Dynamic Loading Screen Overlay Element Creation with Reload Button
 const loadingOverlay = document.createElement('div');
+loadingOverlay.id = 'dynamicLoadingOverlay';
 loadingOverlay.style.cssText = `
     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: #111111; z-index: 9999; display: flex;
     flex-direction: column; justify-content: center; align-items: center;
-    color: #ffffff; font-family: sans-serif;
+    color: #ffffff; font-family: sans-serif; transition: opacity 0.4s ease;
 `;
 loadingOverlay.innerHTML = `
     <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading Game Assets...</h3>
@@ -35,14 +36,29 @@ loadingOverlay.innerHTML = `
         <div id="progressBar" style="width: 0%; height: 100%; background: #2ecc71; transition: width 0.2s ease;"></div>
     </div>
     <span id="progressText" style="margin-top: 10px; font-size: 13px; color: #aaa;">0%</span>
+    <button id="manualReloadBtn" onclick="window.location.reload()" style="
+        margin-top: 20px; padding: 8px 16px; background: #e74c3c; color: white;
+        border: none; border-radius: 6px; font-size: 12px; font-weight: bold;
+        cursor: pointer; display: none; box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+    ">Reload Game</button>
 `;
 document.body.appendChild(loadingOverlay);
 
 const progressBar = document.getElementById('progressBar');
 const progressText = document.getElementById('progressText');
+const manualReloadBtn = document.getElementById('manualReloadBtn');
+
+const reloadButtonTimer = setTimeout(() => {
+    if (manualReloadBtn && loadingOverlay.parentNode) {
+        manualReloadBtn.style.display = 'block';
+    }
+}, 3000);
 
 const assetEntries = [
-    { key: 'map', url: `${repoBaseUrl}map_8.jpg` },
+    { key: 'map_8', url: `${repoBaseUrl}map_8.jpg` },
+    { key: 'botmapinfo1', url: `${repoBaseUrl}botmapinfo1.jpg`, fallbackUrl: `${repoBaseUrl}botmapinfo1.png` },
+    { key: 'botmapinfo2', url: `${repoBaseUrl}botmapinfo2.jpg`, fallbackUrl: `${repoBaseUrl}botmapinfo2.png` },
+    { key: 'botmapinfo3', url: `${repoBaseUrl}botmapinfo3.jpg`, fallbackUrl: `${repoBaseUrl}botmapinfo3.png` },
     { key: 'blueAntiair', url: `${repoBaseUrl}blueantiair.png` },
     { key: 'redAntiair', url: `${repoBaseUrl}redantiair.png` },
     { key: 'blueArtillery', url: `${repoBaseUrl}blueartillery.png` },
@@ -64,23 +80,44 @@ const assetEntries = [
 let loadedCount = 0;
 const totalAssets = assetEntries.length;
 
-let mapImg = new Image(), mapLoaded = false;
-let blueAntiairImg = new Image(), blueAntiairLoaded = false;
-let redAntiairImg = new Image(), redAntiairLoaded = false;
-let blueArtilleryImg = new Image(), blueArtilleryLoaded = false;
-let redArtilleryImg = new Image(), redArtilleryLoaded = false;
-let blueEngineerImg = new Image(), blueEngineerLoaded = false;
-let redEngineerImg = new Image(), redEngineerLoaded = false;
-let blueInfantryImg = new Image(), blueInfantryLoaded = false;
-let redInfantryImg = new Image(), redInfantryLoaded = false;
-let blueMineImg = new Image(), blueMineLoaded = false;
-let redMineImg = new Image(), redMineLoaded = false;
-let bluePlaneImg = new Image(), bluePlaneLoaded = false;
-let redPlaneImg = new Image(), redPlaneLoaded = false;
-let blueShipImg = new Image(), blueShipLoaded = false;
-let redShipImg = new Image(), redShipLoaded = false;
-let blueTankImg = new Image(), blueTankLoaded = false;
-let redTankImg = new Image(), redTankLoaded = false;
+const gameImages = {};
+const assetLoadedFlags = {};
+
+assetEntries.forEach(entry => {
+    gameImages[entry.key] = new Image();
+    assetLoadedFlags[entry.key] = false;
+});
+
+let activeMapKey = 'map_8';
+let activeMapData = typeof getMapConfigByKey === 'function' ? getMapConfigByKey('map_8') : null;
+let mapImg = gameImages['map_8'];
+
+const blueAntiairImg = gameImages['blueAntiair'];
+const redAntiairImg = gameImages['redAntiair'];
+const blueArtilleryImg = gameImages['blueArtillery'];
+const redArtilleryImg = gameImages['redArtillery'];
+const blueEngineerImg = gameImages['blueEngineer'];
+const redEngineerImg = gameImages['redEngineer'];
+const blueInfantryImg = gameImages['blueInfantry'];
+const redInfantryImg = gameImages['redInfantry'];
+const blueMineImg = gameImages['blueMine'];
+const redMineImg = gameImages['redMine'];
+const bluePlaneImg = gameImages['bluePlane'];
+const redPlaneImg = gameImages['redPlane'];
+const blueShipImg = gameImages['blueShip'];
+const redShipImg = gameImages['redShip'];
+const blueTankImg = gameImages['blueTank'];
+const redTankImg = gameImages['redTank'];
+
+let mapLoaded = false;
+let blueAntiairLoaded = false, redAntiairLoaded = false;
+let blueArtilleryLoaded = false, redArtilleryLoaded = false;
+let blueEngineerLoaded = false, redEngineerLoaded = false;
+let blueInfantryLoaded = false, redInfantryLoaded = false;
+let blueMineLoaded = false, redMineLoaded = false;
+let bluePlaneLoaded = false, redPlaneLoaded = false;
+let blueShipLoaded = false, redShipLoaded = false;
+let blueTankLoaded = false, redTankLoaded = false;
 
 function updateLoadingProgress() {
     loadedCount++;
@@ -89,6 +126,7 @@ function updateLoadingProgress() {
     if (progressText) progressText.innerText = percent + '%';
 
     if (loadedCount >= totalAssets) {
+        clearTimeout(reloadButtonTimer);
         console.log("[SUCCESS][map_setup] All game assets loaded successfully.");
         dismissLoadingScreen();
     }
@@ -98,65 +136,107 @@ function dismissLoadingScreen() {
     setTimeout(() => {
         if (loadingOverlay && loadingOverlay.parentNode) {
             loadingOverlay.style.opacity = '0';
-            loadingOverlay.style.transition = 'opacity 0.4s ease';
             setTimeout(() => loadingOverlay.remove(), 400);
         }
     }, 200);
 }
 
-// Failsafe: Force-dismiss loading overlay after 6 seconds even if a CDN asset stalls
 setTimeout(() => {
     if (loadedCount < totalAssets) {
         console.warn("[WARN][map_setup] Loading timeout reached. Force-dismissing loading screen.");
         dismissLoadingScreen();
     }
-}, 6000);
+}, 8000);
 
-function loadAssetDirectly(url, imgObj, setLoadedFlag) {
+function loadAssetDynamic(entry) {
+    const imgObj = gameImages[entry.key];
     imgObj.crossOrigin = "anonymous";
+    let triedFallback = false;
+
     imgObj.onload = () => {
-        setLoadedFlag(true);
+        assetLoadedFlags[entry.key] = true;
+        syncLegacyFlags(entry.key, true);
         updateLoadingProgress();
     };
+
     imgObj.onerror = (err) => {
-        console.error(`[ERROR][map_setup] Failed to load asset: ${url}`, err);
-        // Still count it as processed so the loading bar doesn't freeze permanently
-        setLoadedFlag(true);
+        if (entry.fallbackUrl && !triedFallback) {
+            triedFallback = true;
+            imgObj.src = entry.fallbackUrl;
+            return;
+        }
+        console.warn(`[WARN][map_setup] Asset not available yet: ${entry.url}`);
+        assetLoadedFlags[entry.key] = true;
+        syncLegacyFlags(entry.key, true);
         updateLoadingProgress();
     };
-    imgObj.src = url;
+
+    imgObj.src = entry.url;
 }
 
-// Map key assignments to actual Image objects
-const imageBindingMap = {
-    'map': { obj: mapImg, flag: (val) => { mapLoaded = val; } },
-    'blueAntiair': { obj: blueAntiairImg, flag: (val) => { blueAntiairLoaded = val; } },
-    'redAntiair': { obj: redAntiairImg, flag: (val) => { redAntiairLoaded = val; } },
-    'blueArtillery': { obj: blueArtilleryImg, flag: (val) => { blueArtilleryLoaded = val; } },
-    'redArtillery': { obj: redArtilleryImg, flag: (val) => { redArtilleryLoaded = val; } },
-    'blueEngineer': { obj: blueEngineerImg, flag: (val) => { blueEngineerLoaded = val; } },
-    'redEngineer': { obj: redEngineerImg, flag: (val) => { redEngineerLoaded = val; } },
-    'blueInfantry': { obj: blueInfantryImg, flag: (val) => { blueInfantryLoaded = val; } },
-    'redInfantry': { obj: redInfantryImg, flag: (val) => { redInfantryLoaded = val; } },
-    'blueMine': { obj: blueMineImg, flag: (val) => { blueMineLoaded = val; } },
-    'redMine': { obj: redMineImg, flag: (val) => { redMineLoaded = val; } },
-    'bluePlane': { obj: bluePlaneImg, flag: (val) => { bluePlaneLoaded = val; } },
-    'redPlane': { obj: redPlaneImg, flag: (val) => { redPlaneLoaded = val; } },
-    'blueShip': { obj: blueShipImg, flag: (val) => { blueShipLoaded = val; } },
-    'redShip': { obj: redShipImg, flag: (val) => { redShipLoaded = val; } },
-    'blueTank': { obj: blueTankImg, flag: (val) => { blueTankLoaded = val; } },
-    'redTank': { obj: redTankImg, flag: (val) => { redTankLoaded = val; } }
-};
+function syncLegacyFlags(key, val) {
+    if (key === activeMapKey) mapLoaded = val;
+    if (key === 'blueAntiair') blueAntiairLoaded = val;
+    if (key === 'redAntiair') redAntiairLoaded = val;
+    if (key === 'blueArtillery') blueArtilleryLoaded = val;
+    if (key === 'redArtillery') redArtilleryLoaded = val;
+    if (key === 'blueEngineer') blueEngineerLoaded = val;
+    if (key === 'redEngineer') redEngineerLoaded = val;
+    if (key === 'blueInfantry') blueInfantryLoaded = val;
+    if (key === 'redInfantry') redInfantryLoaded = val;
+    if (key === 'blueMine') blueMineLoaded = val;
+    if (key === 'redMine') redMineLoaded = val;
+    if (key === 'bluePlane') bluePlaneLoaded = val;
+    if (key === 'redPlane') redPlaneLoaded = val;
+    if (key === 'blueShip') blueShipLoaded = val;
+    if (key === 'redShip') redShipLoaded = val;
+    if (key === 'blueTank') blueTankLoaded = val;
+    if (key === 'redTank') redTankLoaded = val;
+}
 
-// Trigger parallel non-blocking loads for all assets
 assetEntries.forEach(entry => {
-    let binding = imageBindingMap[entry.key];
-    if (binding) {
-        loadAssetDirectly(entry.url, binding.obj, binding.flag);
-    }
+    loadAssetDynamic(entry);
 });
 
+function switchActiveMap(lvlNum) {
+    const targetKey = typeof getMapKeyForLevel === 'function' ? getMapKeyForLevel(lvlNum) : 'map_8';
+    activeMapKey = targetKey;
+    activeMapData = typeof getMapConfigByKey === 'function' ? getMapConfigByKey(targetKey) : null;
+
+    if (gameImages[targetKey]) {
+        mapImg = gameImages[targetKey];
+        mapLoaded = Boolean(assetLoadedFlags[targetKey]);
+    }
+
+    if (typeof syncGoldCoresFromMap === 'function' && activeMapData) {
+        syncGoldCoresFromMap(activeMapData);
+    }
+
+    console.log(`[INFO][map_setup] Active map switched to '${activeMapKey}' for Level ${lvlNum}.`);
+}
+
 function getTerrain(c, r) {
+    if (activeMapData && !activeMapData.useLegacyTerrain) {
+        const key = `${c},${r}`;
+
+        if (activeMapData.hq) {
+            const hqMatch = activeMapData.hq.find(item => item.coordinates === key);
+            if (hqMatch) {
+                if (hqMatch.type_name === 'rbc') return 'red_core';
+                if (hqMatch.type_name === 'bbc') return 'blue_core';
+                if (hqMatch.type_name === 'r') return 'red_base';
+                if (hqMatch.type_name === 'b') return 'blue_base';
+            }
+        }
+
+        if (activeMapData.water && activeMapData.water.includes(key)) {
+            return 'water';
+        }
+
+        // Gold cores and gold tile links are now fully treated as land (passable)
+        return 'land';
+    }
+
     const colChar = String.fromCharCode(65 + c);
     const rowNum = r + 1;
     const coord = colChar + rowNum;
@@ -177,9 +257,6 @@ function getTerrain(c, r) {
 
     if (coord === 'L1') return 'red_core';
     if (coord === 'K1' || coord === 'M1' || coord === 'K2' || coord === 'L2' || coord === 'M2') return 'red_base';
-
-    const goldCoresList = ['G5', 'B6', 'M8', 'F15', 'Q13', 'L17'];
-    if (goldCoresList.includes(coord)) return 'gold_core';
 
     return 'land';
 }
@@ -202,38 +279,24 @@ function getBaseSquares(team) {
     return squares;
 }
 
-function getPortSquare(team) {
-    for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-            let t = getTerrain(c, r);
-            if (team === 'blue' && t === 'blue_navy') return {c, r};
-            if (team === 'red' && t === 'red_navy') return {c, r};
-        }
-    }
-    return {c:0, r:0};
-}
-
 function spawnTeam(team) {
     let isBlue = (team === 'blue');
     let baseSquares = getBaseSquares(team);
 
     let infImgRef = isBlue ? blueInfantryImg : redInfantryImg;
-    let infLoadRef = () => isBlue ? blueInfantryLoaded : redInfantryLoaded;
-
     let tankImgRef = isBlue ? blueTankImg : redTankImg;
-    let tankLoadRef = () => isBlue ? blueTankLoaded : redTankLoaded;
 
     let unitsToSpawn = isBlue ? [
-        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef, loaded: infLoadRef }
+        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef }
     ] : [
-        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef, loaded: infLoadRef },
-        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef, loaded: infLoadRef },
-        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef, loaded: infLoadRef },
-        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef, loaded: infLoadRef },
-        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef, loaded: infLoadRef },
-        { name: 'Tank', type: 'land', range: 3, speed: 3, img: tankImgRef, loaded: tankLoadRef },
-        { name: 'Tank', type: 'land', range: 3, speed: 3, img: tankImgRef, loaded: tankLoadRef },
-        { name: 'Tank', type: 'land', range: 3, speed: 3, img: tankImgRef, loaded: tankLoadRef }
+        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef },
+        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef },
+        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef },
+        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef },
+        { name: 'Infantry', type: 'land', range: 2, speed: 2, img: infImgRef },
+        { name: 'Tank', type: 'land', range: 3, speed: 3, img: tankImgRef },
+        { name: 'Tank', type: 'land', range: 3, speed: 3, img: tankImgRef },
+        { name: 'Tank', type: 'land', range: 3, speed: 3, img: tankImgRef }
     ];
 
     unitsToSpawn.forEach((template, index) => {
@@ -248,7 +311,6 @@ function spawnTeam(team) {
             x: pos.c * cellSize,
             y: pos.r * cellSize,
             img: template.img,
-            loaded: template.loaded,
             team: team,
             facing: 0
         });
@@ -260,4 +322,4 @@ function spawnTeam(team) {
 spawnTeam('blue');
 spawnTeam('red');
 
-console.log("[SUCCESS][map_setup] Optimized map setup initialization complete.");
+console.log("[SUCCESS][map_setup] Safe dynamic map setup initialization complete.");
