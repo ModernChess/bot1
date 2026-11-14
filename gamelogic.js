@@ -1,16 +1,28 @@
 // =========================================================================
-// GAME RENDERER, UNIT MANAGEMENT, & LOOP LOGIC (game-renderer.js)
+// GAME RENDERER, UNIT MANAGEMENT, & LOOP LOGIC (gamelogic.js)
 // =========================================================================
 
 window.loadCampaignLevel = function(targetLevel) {
     currentCampaignLevel = targetLevel;
     localStorage.setItem(`chess_campaign_level_${cachedUser}`, currentCampaignLevel);
     
+    // Always reset temporary gold to 2 when loading any stage (including retrying/reloading a lost stage)
+    if (typeof userGoldCoins !== 'undefined') {
+        userGoldCoins = 2;
+    }
+
     if (typeof window.activeRedBotPath !== 'undefined') {
         window.activeRedBotPath = [];
     }
 
     toggleLevelSelectModal();
+
+    // 1. Switch the map layout, background image, and core coordinates dynamically based on level
+    if (typeof switchActiveMap === 'function') {
+        switchActiveMap(currentCampaignLevel);
+    }
+
+    // 2. Initialize units for the newly selected level and map
     initLevelUnits(currentCampaignLevel);
     updateHudDisplay();
     
@@ -20,10 +32,15 @@ window.loadCampaignLevel = function(targetLevel) {
     window._xpAwardedProcessed = false;
     window._levelAdvancementLocked = false;
 
-    console.log(`[INFO][game-renderer.js] Loaded Campaign Level ${targetLevel} (${getStageDisplayLabel(targetLevel)}) & Cleared Pathfinders.`);
+    console.log(`[INFO][gamelogic.js] Loaded Campaign Level ${targetLevel} (${getStageDisplayLabel(targetLevel)}) & switched map successfully. Gold reset to 2.`);
 };
 
 function initLevelUnits(lvlNum) {
+    // Ensure map config and gold cores are completely fresh for the target level
+    if (typeof switchActiveMap === 'function') {
+        switchActiveMap(lvlNum);
+    }
+
     if (typeof units === 'undefined') return;
     units.length = 0;
 
@@ -31,33 +48,60 @@ function initLevelUnits(lvlNum) {
     const blueBase = typeof getBaseSquares === 'function' ? getBaseSquares('blue') : [{c:0, r:11}];
     const redBase = typeof getBaseSquares === 'function' ? getBaseSquares('red') : [{c:11, r:0}];
 
-    config.blueUnits.forEach((template, index) => {
-        let pos = (config.customBluePos && config.customBluePos[index]) ? config.customBluePos[index] : (blueBase[index % blueBase.length] || { c: 0, r: 11 });
-        let imgRef = template.name === 'Tank' ? blueTankImg : blueInfantryImg;
-        let loadRef = template.name === 'Tank' ? () => blueTankLoaded : () => blueInfantryLoaded;
+    // Helper resolver to handle Artillery, Tanks, and Infantry correctly for any team
+    const resolveUnitAssets = (team, templateName) => {
+        let nameLower = (templateName || '').toLowerCase();
+        let isBlue = (team === 'blue');
 
-        units.push({
-            name: template.name, type: template.type, range: template.range,
-            speed: template.name === 'Tank' ? 3 : 2, gridX: pos.c, gridY: pos.r,
-            x: pos.c * cellSize, y: pos.r * cellSize, img: imgRef, loaded: loadRef, team: 'blue', facing: 0,
-            invisible: false
+        if (nameLower.includes('artillery')) {
+            return {
+                img: isBlue ? blueArtilleryImg : redArtilleryImg,
+                load: isBlue ? () => blueArtilleryLoaded : () => redArtilleryLoaded,
+                speed: 2
+            };
+        } else if (nameLower.includes('tank')) {
+            return {
+                img: isBlue ? blueTankImg : redTankImg,
+                load: isBlue ? () => blueTankLoaded : () => redTankLoaded,
+                speed: 3
+            };
+        } else {
+            return {
+                img: isBlue ? blueInfantryImg : redInfantryImg,
+                load: isBlue ? () => blueInfantryLoaded : () => redInfantryLoaded,
+                speed: 2
+            };
+        }
+    };
+
+    if (config.blueUnits && Array.isArray(config.blueUnits)) {
+        config.blueUnits.forEach((template, index) => {
+            let pos = (config.customBluePos && config.customBluePos[index]) ? config.customBluePos[index] : (blueBase[index % blueBase.length] || { c: 0, r: 11 });
+            let assetData = resolveUnitAssets('blue', template.name);
+
+            units.push({
+                name: template.name, type: template.type, range: template.range,
+                speed: template.speed || assetData.speed, gridX: pos.c, gridY: pos.r,
+                x: pos.c * cellSize, y: pos.r * cellSize, img: assetData.img, loaded: assetData.load, team: 'blue', facing: 0,
+                invisible: false
+            });
         });
-    });
+    }
 
-    config.redUnits.forEach((template, index) => {
-        let pos = (config.customRedPos && config.customRedPos[index]) ? config.customRedPos[index] : (redBase[index % redBase.length] || { c: 11, r: 0 });
-        let isInvisible = (pos.c === 17 && pos.r === 0);
+    if (config.redUnits && Array.isArray(config.redUnits)) {
+        config.redUnits.forEach((template, index) => {
+            let pos = (config.customRedPos && config.customRedPos[index]) ? config.customRedPos[index] : (redBase[index % redBase.length] || { c: 11, r: 0 });
+            let isInvisible = (pos.c === 17 && pos.r === 0);
+            let assetData = resolveUnitAssets('red', template.name);
 
-        let imgRef = template.name === 'Tank' ? redTankImg : redInfantryImg;
-        let loadRef = template.name === 'Tank' ? () => redTankLoaded : () => redInfantryLoaded;
-
-        units.push({
-            name: template.name, type: template.type, range: template.range,
-            speed: template.name === 'Tank' ? 3 : 2, gridX: pos.c, gridY: pos.r,
-            x: pos.c * cellSize, y: pos.r * cellSize, img: imgRef, loaded: loadRef, team: 'red', facing: 0,
-            invisible: isInvisible
+            units.push({
+                name: template.name, type: template.type, range: template.range,
+                speed: template.speed || assetData.speed, gridX: pos.c, gridY: pos.r,
+                x: pos.c * cellSize, y: pos.r * cellSize, img: assetData.img, loaded: assetData.load, team: 'red', facing: 0,
+                invisible: isInvisible
+            });
         });
-    });
+    }
 }
 
 setInterval(() => {
@@ -79,10 +123,15 @@ setInterval(() => {
 
             if (typeof humanMatchXp !== 'undefined') humanMatchXp = 0;
 
-            if (currentCampaignLevel < 20) {
+            if (currentCampaignLevel < 55) {
                 currentCampaignLevel++;
                 localStorage.setItem(`chess_campaign_level_${cachedUser}`, currentCampaignLevel);
-                console.log(`[INFO][game-renderer.js] Victory registered! Advanced to level: ${currentCampaignLevel}`);
+                console.log(`[INFO][gamelogic.js] Victory registered! Advanced to level: ${currentCampaignLevel}`);
+            }
+
+            // Reset temporary session gold to 2 upon victory/stage transition
+            if (typeof userGoldCoins !== 'undefined') {
+                userGoldCoins = 2;
             }
 
             let rankData = getPlayerRank(totalUserXp);
@@ -101,7 +150,14 @@ setInterval(() => {
 
 window.addEventListener('load', () => {
     setTimeout(() => {
+        // Always ensure gold starts at 2 when page first loads or reloads
+        if (typeof userGoldCoins !== 'undefined') {
+            userGoldCoins = 2;
+        }
         injectCampaignUI();
+        if (typeof switchActiveMap === 'function') {
+            switchActiveMap(currentCampaignLevel);
+        }
         initLevelUnits(currentCampaignLevel);
     }, 500);
 });
