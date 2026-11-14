@@ -1,5 +1,5 @@
 // =========================================================================
-// MAP SETUP & ASSET INITIALIZATION CONTROLLER (Lightning-Fast & Non-Blocking)
+// MAP SETUP & STRICT LOADING SCREEN CONTROLLER
 // =========================================================================
 
 const canvas = document.getElementById('gameCanvas');
@@ -21,36 +21,26 @@ function lerp(start, end, t) {
 
 const repoBaseUrl = 'https://raw.githubusercontent.com/ModernChess/assets-images/main/';
 
-// Dynamic Loading Screen Overlay Element Creation
+// Dynamic Loading Screen Overlay Element Creation (Stays visible until 100% fully loaded)
 const loadingOverlay = document.createElement('div');
 loadingOverlay.id = 'dynamicLoadingOverlay';
 loadingOverlay.style.cssText = `
     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: #111111; z-index: 9999; display: flex;
     flex-direction: column; justify-content: center; align-items: center;
-    color: #ffffff; font-family: sans-serif; transition: opacity 0.3s ease;
+    color: #ffffff; font-family: sans-serif; transition: opacity 0.4s ease;
 `;
 loadingOverlay.innerHTML = `
-    <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading mchess ai...</h3>
-    <div style="width: 240px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; border: 1px solid #333;">
-        <div id="progressBar" style="width: 100%; height: 100%; background: #2ecc71; transition: width 0.1s ease;"></div>
+    <h3 style="margin-bottom: 12px; font-weight: 600; letter-spacing: 1px;">Loading mchess ai & Game Assets...</h3>
+    <div style="width: 260px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; border: 1px solid #333;">
+        <div id="progressBar" style="width: 0%; height: 100%; background: #2ecc71; transition: width 0.2s ease;"></div>
     </div>
-    <span id="progressText" style="margin-top: 10px; font-size: 13px; color: #aaa;">Ready</span>
+    <span id="progressText" style="margin-top: 10px; font-size: 13px; color: #aaa;">0%</span>
 `;
 document.body.appendChild(loadingOverlay);
 
-let loadingDismissed = false;
-function dismissLoadingScreen() {
-    if (loadingDismissed) return;
-    loadingDismissed = true;
-    if (loadingOverlay && loadingOverlay.parentNode) {
-        loadingOverlay.style.opacity = '0';
-        setTimeout(() => loadingOverlay.remove(), 300);
-    }
-}
-
-// Fail-safe: Automatically dismiss loading screen after 800ms max so it never gets stuck on GitHub Pages
-setTimeout(dismissLoadingScreen, 800);
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
 
 const assetEntries = [
     { key: 'map_8', url: `${repoBaseUrl}map_8.jpg` },
@@ -75,8 +65,39 @@ const assetEntries = [
     { key: 'redTank', url: `${repoBaseUrl}redtank.png` }
 ];
 
+let loadedCount = 0;
+const totalAssets = assetEntries.length;
 const gameImages = {};
 const assetLoadedFlags = {};
+
+function updateLoadingProgress() {
+    loadedCount++;
+    let percent = Math.min(100, Math.floor((loadedCount / totalAssets) * 100));
+    if (progressBar) progressBar.style.width = percent + '%';
+    if (progressText) progressText.innerText = percent + '%';
+
+    if (loadedCount >= totalAssets) {
+        console.log("[SUCCESS][map_setup] All assets loaded. Finalizing UI initialization...");
+        if (document.readyState === 'complete') {
+            finalizeGameLoading();
+        } else {
+            window.addEventListener('load', finalizeGameLoading);
+        }
+    }
+}
+
+function finalizeGameLoading() {
+    setTimeout(() => {
+        if (typeof injectCampaignUI === 'function') {
+            injectCampaignUI();
+        }
+        if (loadingOverlay && loadingOverlay.parentNode) {
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => loadingOverlay.remove(), 400);
+        }
+        console.log("[SUCCESS][map_setup] Game fully loaded and rendered. Loading screen dismissed.");
+    }, 250);
+}
 
 assetEntries.forEach(entry => {
     gameImages[entry.key] = new Image();
@@ -86,15 +107,18 @@ assetEntries.forEach(entry => {
     gameImages[entry.key].onload = () => {
         assetLoadedFlags[entry.key] = true;
         syncLegacyFlags(entry.key, true);
+        updateLoadingProgress();
     };
 
     gameImages[entry.key].onerror = () => {
-        if (entry.fallbackUrl) {
+        if (entry.fallbackUrl && !gameImages[entry.key]._triedFallback) {
+            gameImages[entry.key]._triedFallback = true;
             gameImages[entry.key].src = entry.fallbackUrl;
             return;
         }
-        assetLoadedFlags[entry.key] = true; // Mark loaded anyway to prevent blocking
+        assetLoadedFlags[entry.key] = true; // Count as loaded to prevent deadlock
         syncLegacyFlags(entry.key, true);
+        updateLoadingProgress();
     };
 
     gameImages[entry.key].src = entry.url;
@@ -121,15 +145,15 @@ const redShipImg = gameImages['redShip'];
 const blueTankImg = gameImages['blueTank'];
 const redTankImg = gameImages['redTank'];
 
-let mapLoaded = true; // Default true so rendering starts instantly without waiting
-let blueAntiairLoaded = true, redAntiairLoaded = true;
-let blueArtilleryLoaded = true, redArtilleryLoaded = true;
-let blueEngineerLoaded = true, redEngineerLoaded = true;
-let blueInfantryLoaded = true, redInfantryLoaded = true;
-let blueMineLoaded = true, redMineLoaded = true;
-let bluePlaneLoaded = true, redPlaneLoaded = true;
-let blueShipLoaded = true, redShipLoaded = true;
-let blueTankLoaded = true, redTankLoaded = true;
+let mapLoaded = false;
+let blueAntiairLoaded = false, redAntiairLoaded = false;
+let blueArtilleryLoaded = false, redArtilleryLoaded = false;
+let blueEngineerLoaded = false, redEngineerLoaded = false;
+let blueInfantryLoaded = false, redInfantryLoaded = false;
+let blueMineLoaded = false, redMineLoaded = false;
+let bluePlaneLoaded = false, redPlaneLoaded = false;
+let blueShipLoaded = false, redShipLoaded = false;
+let blueTankLoaded = false, redTankLoaded = false;
 
 function syncLegacyFlags(key, val) {
     if (key === activeMapKey) mapLoaded = val;
@@ -158,7 +182,7 @@ function switchActiveMap(lvlNum) {
 
     if (gameImages[targetKey]) {
         mapImg = gameImages[targetKey];
-        mapLoaded = true;
+        mapLoaded = Boolean(assetLoadedFlags[targetKey]);
     }
 
     if (typeof syncGoldCoresFromMap === 'function' && activeMapData) {
@@ -208,7 +232,7 @@ function getTerrain(c, r) {
     if (coord === 'A11' || coord === 'B11' || coord === 'B12' || coord === 'A13' || coord === 'B13') return 'blue_base';
 
     if (coord === 'L1') return 'red_core';
-    if (coord === 'K1' || coord === 'M1' || coord === 'K2' === 'L2' || coord === 'M2') return 'red_base';
+    if (coord === 'K1' || coord === 'M1' || coord === 'K2' || coord === 'L2' || coord === 'M2') return 'red_base';
 
     return 'land';
 }
@@ -274,6 +298,4 @@ function spawnTeam(team) {
 spawnTeam('blue');
 spawnTeam('red');
 
-// Immediately dismiss loading screen on successful initialization
-dismissLoadingScreen();
-console.log("[SUCCESS][map_setup] Non-blocking lightning-fast asset loading & map setup complete.");
+console.log("[SUCCESS][map_setup] Strict loading controller initialized.");
