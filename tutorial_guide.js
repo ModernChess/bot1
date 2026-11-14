@@ -23,32 +23,32 @@ const TutorialGuide = {
         cloud.style.cssText = `
             display: none;
             position: relative;
-            margin: 6px auto 4px auto;
-            background: rgba(18, 18, 18, 0.85);
+            margin: 8px auto 6px auto;
+            background: rgba(18, 18, 18, 0.9);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(59, 130, 246, 0.4);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-            padding: 8px 12px;
-            border-radius: 10px;
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            padding: 10px 14px;
+            border-radius: 12px;
             color: #ffffff;
             font-family: 'Poppins', 'Segoe UI', sans-serif;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 600;
             z-index: 99;
-            max-width: 480px;
-            width: 95%;
+            max-width: 500px;
+            width: 96%;
             text-align: center;
             pointer-events: none;
             box-sizing: border-box;
             transition: all 0.3s ease;
         `;
         cloud.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 2px;">
-                <span style="font-size: 13px;">🏁</span>
-                <span style="color: #60a5fa; text-transform: uppercase; font-size: 9px; letter-spacing: 1px; font-weight: 800;">Battle Trainer</span>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 3px;">
+                <span style="font-size: 14px;">🏁</span>
+                <span style="color: #60a5fa; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; font-weight: 800;">Battle Trainer</span>
             </div>
-            <div id="tutorialCloudMessage" style="line-height: 1.35; text-shadow: 0 2px 4px rgba(0,0,0,0.6);"></div>
+            <div id="tutorialCloudMessage" style="line-height: 1.4; text-shadow: 0 2px 4px rgba(0,0,0,0.6);"></div>
         `;
 
         // Append the cloud right below the board's outer frame container
@@ -98,7 +98,7 @@ const TutorialGuide = {
             this.active = true;
 
             if (currentCampaignLevel === 1) {
-                this.currentStepText = "Tutorial (1): \"Welcome! Zoom in and tap your Infantry soldier to select him. He can move up to 2 tiles at a time. Green outlines mean it's your turn to play. Follow the red line to reach the base!\"";
+                this.currentStepText = "Tutorial (1): \"Welcome! Tap your Infantry soldier to select him. He can move up to 2 tiles at a time. Green outlines mean it's your turn to play. Follow the red line to reach the base!\"";
                 this.targetPosition = { c: 17, r: 0 }; 
                 this.targetUnitName = null;
             } else if (currentCampaignLevel === 2) {
@@ -146,7 +146,11 @@ const TutorialGuide = {
                 }
             } else {
                 const stageNum = currentCampaignLevel - 5;
-                this.targetPosition = { c: 11, r: 0 }; 
+                
+                // Dynamic Red base target lookup from goldCores (points to 12,17 on botmapinfo1)
+                const redBaseCore = typeof goldCores !== 'undefined' ? goldCores.find(gc => gc.isBase && gc.teamBase === 'red') : null;
+                this.targetPosition = redBaseCore ? { c: redBaseCore.c, r: redBaseCore.r } : { c: 11, r: 0 };
+                
                 this.targetUnitName = null;
 
                 if (stageNum === 1) {
@@ -179,7 +183,13 @@ const TutorialGuide = {
                             let cacheRes = buildSuperpowerCache(units);
                             unitPowerMap = cacheRes.unitPowerMap;
                         }
-                        window.activeRedBotPath = findPathToTarget(blueUnit, 11, 0, unitPowerMap, [], true) || [];
+                        
+                        // Dynamic Red base target lookup for pathfinder preview
+                        const redBaseCore = typeof goldCores !== 'undefined' ? goldCores.find(gc => gc.isBase && gc.teamBase === 'red') : null;
+                        const targetC = redBaseCore ? redBaseCore.c : 11;
+                        const targetR = redBaseCore ? redBaseCore.r : 0;
+
+                        window.activeRedBotPath = findPathToTarget(blueUnit, targetC, targetR, unitPowerMap, [], true) || [];
                     }
                 }
             }
