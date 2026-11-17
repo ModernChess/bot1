@@ -466,7 +466,7 @@ function executeRedBotTurn() {
         return;
     }
 
-    //   // =========================================================================
+     //   // =========================================================================
     // STEP 5: FALLBACK MOVE
     // =========================================================================
     let fallbackUnit = movableUnits[0];
@@ -479,8 +479,7 @@ function executeRedBotTurn() {
             tryMoveUnit(fallbackUnit, randomMove.c, randomMove.r);
         }
     }
-
-    setTimeout(() => {
+setTimeout(() => {
         currentTurn = 'blue';
     }, 800);
 }
