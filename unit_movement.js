@@ -5,7 +5,7 @@
 import { getCameraState, screenToWorldCoordinates, applyCameraTransform } from './viewport.js';
 import { getGridCoordinatesFromClient } from './game-input.js';
 
-let selectedUnit = null;     
+window.selectedUnit = null;     
 let legalMoves = [];         
 let pendingMoveDestination = null; // Two-step confirmation target tile
 let rangeMode = false;
@@ -333,13 +333,13 @@ canvas.addEventListener('pointerup', (e) => {
     if (r >= 0 && r < rows && c >= 0 && c < cols) {
         let clickedUnit = units.find(u => u.gridX === c && u.gridY === r && !u.invisible);
 
-        if (selectedUnit && !rangeMode) {
+        if (window.selectedUnit && !rangeMode) {
             let matchedLegalMove = legalMoves.find(m => m.c === c && m.r === r);
             if (matchedLegalMove) {
                 if (pendingMoveDestination && pendingMoveDestination.c === c && pendingMoveDestination.r === r) {
-                    let success = tryMoveUnit(selectedUnit, c, r);
+                    let success = tryMoveUnit(window.selectedUnit, c, r);
                     if (success) {
-                        selectedUnit = null;
+                        window.selectedUnit = null;
                         legalMoves = [];
                         pendingMoveDestination = null;
 
@@ -358,10 +358,10 @@ canvas.addEventListener('pointerup', (e) => {
         if (clickedUnit) {
             let unitTeam = getTeamFromUnit(clickedUnit);
             
-            if (selectedUnit && rangeMode && (selectedUnit.name || '').includes('Artillery')) {
-                let attackerTeam = getTeamFromUnit(selectedUnit);
+            if (window.selectedUnit && rangeMode && (window.selectedUnit.name || '').includes('Artillery')) {
+                let attackerTeam = getTeamFromUnit(window.selectedUnit);
                 if (unitTeam !== attackerTeam) {
-                    let combatRanges = getUnitCombatRange(selectedUnit);
+                    let combatRanges = getUnitCombatRange(window.selectedUnit);
                     let inRange = combatRanges.some(rangeBox => 
                         clickedUnit.gridX >= rangeBox.startC && clickedUnit.gridX <= rangeBox.endC &&
                         clickedUnit.gridY >= rangeBox.startR && clickedUnit.gridY <= rangeBox.endR
@@ -370,9 +370,9 @@ canvas.addEventListener('pointerup', (e) => {
                     if (inRange) {
                         SystemLog.info('Artillery target acquired within range. Triggering card duel.');
                         if (typeof triggerArtilleryDuel === 'function') {
-                            triggerArtilleryDuel(selectedUnit, clickedUnit);
+                            triggerArtilleryDuel(window.selectedUnit, clickedUnit);
                         }
-                        selectedUnit = null;
+                        window.selectedUnit = null;
                         rangeMode = false;
                         rangeSquares = [];
                         pendingMoveDestination = null;
@@ -386,7 +386,7 @@ canvas.addEventListener('pointerup', (e) => {
                 return; 
             }
 
-            selectedUnit = clickedUnit;
+            window.selectedUnit = clickedUnit;
             legalMoves = getLegalMoves(clickedUnit);
             pendingMoveDestination = null;
             rangeMode = false; 
@@ -395,20 +395,20 @@ canvas.addEventListener('pointerup', (e) => {
                 window.triggerSelectSound(clickedUnit.name);
             }
         } else {
-            if (selectedUnit && ((selectedUnit.name || '').includes('Ship') || (selectedUnit.name || '').includes('Artillery'))) {
-                let btnX = selectedUnit.renderX + cellSize + 12;
-                let btnY = selectedUnit.renderY - 12;
+            if (window.selectedUnit && ((window.selectedUnit.name || '').includes('Ship') || (window.selectedUnit.name || '').includes('Artillery'))) {
+                let btnX = window.selectedUnit.renderX + cellSize + 12;
+                let btnY = window.selectedUnit.renderY - 12;
                 let btnSize = cellSize * 0.85;
 
                 if (worldCoord.x >= btnX && worldCoord.x <= btnX + btnSize && worldCoord.y >= btnY && worldCoord.y <= btnY + btnSize) {
                     rangeMode = !rangeMode; 
-                    rangeSquares = rangeMode ? getUnitCombatRange(selectedUnit) : [];
+                    rangeSquares = rangeMode ? getUnitCombatRange(window.selectedUnit) : [];
                     return;
                 }
             }
 
             if (!rangeMode) {
-                selectedUnit = null;
+                window.selectedUnit = null;
                 legalMoves = [];
                 pendingMoveDestination = null;
             }
@@ -496,7 +496,7 @@ function update() {
         ctx.fill();
     });
 
-    if (selectedUnit && !(typeof gameOver !== 'undefined' && gameOver)) {
+    if (window.selectedUnit && !(typeof gameOver !== 'undefined' && gameOver)) {
         if (rangeMode) {
             ctx.strokeStyle = '#ffffff'; 
             ctx.lineWidth = 3.5;
@@ -544,7 +544,7 @@ function update() {
 
             ctx.strokeStyle = '#38bdf8';
             ctx.lineWidth = 3;
-            ctx.strokeRect(selectedUnit.renderX + 3, selectedUnit.renderY + 3, cellSize - 6, cellSize - 6);
+            ctx.strokeRect(window.selectedUnit.renderX + 3, window.selectedUnit.renderY + 3, cellSize - 6, cellSize - 6);
         }
     }
 
@@ -634,5 +634,5 @@ function update() {
 window.getLegalMoves = getLegalMoves;
 window.tryMoveUnit = tryMoveUnit;
 
-SystemLog.info('Unit movement controller updated with destruction visual effects and non-selectable units during game over.');
+SystemLog.info('Unit movement controller updated with global window.selectedUnit synchronization.');
 update();
