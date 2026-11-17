@@ -9,7 +9,7 @@ const campaignLevels = [
     { level: 3, title: "Tutorial 3: Elimination Protocol", blueUnits: [{name: 'Tank', type: 'land', range: 3}], redUnits: [{name: 'Infantry', type: 'land', range: 2}], customRedPos: [{c: 16, r: 12}], customBluePos: [{c: 6, r: 4}] },
     { level: 4, title: "Tutorial 4: Defensive Line", blueUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Infantry', type: 'land', range: 2}], redUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Infantry', type: 'land', range: 2}], customRedPos: [{c: 5, r: 14}, {c: 11, r: 16}], customBluePos: [{c: 1, r: 5}, {c: 6, r: 4}] },
     { level: 5, title: "Tutorial 5: Armored Defense", blueUnits: [{name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}], redUnits: [{name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}], customRedPos: [{c: 11, r: 16}, {c: 16, r: 12}], customBluePos: [{c: 1, r: 5}, {c: 6, r: 4}] },
-    { level: 6, title: "Level 6: Early Scouting", blueUnits: [{name: 'Infantry', type: 'land', range: 2}], redUnits: [{name: 'Infantry', type: 'land', range: 2}], customRedPos: [{c: 16, r: 12}], customBluePos: [{c: 1, r: 5}] },
+    { level: 6, title: "Level 6: Early Scouting", blueUnits: [{name: 'Infantry', type: 'land', range: 2}], redUnits: [{name: 'Infantry', type: 'land', range: 2}], customRedPos: [{c: 17, r: 9}], customBluePos: [{c: 4, r: 5}] },
     { level: 7, title: "Level 7: Dual Threat", blueUnits: [{name: 'Infantry', type: 'land', range: 2}], redUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Infantry', type: 'land', range: 2}], customRedPos: [{c: 11, r: 16}, {c: 16, r: 12}], customBluePos: [{c: 1, r: 5}, {c: 6, r: 4}] },
     { level: 8, title: "Level 8: Armored Advance", blueUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Infantry', type: 'land', range: 2}], redUnits: [{name: 'Tank', type: 'land', range: 3}], customRedPos: [{c: 16, r: 12}], customBluePos: [{c: 1, r: 5}, {c: 6, r: 4}] },
     { level: 9, title: "Level 9: Core Clash", blueUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Tank', type: 'land', range: 3}], redUnits: [{name: 'Tank', type: 'land', range: 3}, {name: 'Infantry', type: 'land', range: 2}], customRedPos: [{c: 11, r: 16}, {c: 16, r: 12}], customBluePos: [{c: 1, r: 5}, {c: 6, r: 4}] },
@@ -49,7 +49,6 @@ const campaignLevels = [
     { level: 39, title: "Level 39: Botmap2 Sub-Boss", blueUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Tank', type: 'land', range: 3}], redUnits: [{name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}], customRedPos: [{c: 11, r: 7}, {c: 13, r: 5}, {c: 14, r: 14}], customBluePos: [{c: 0, r: 10}, {c: 1, r: 10}] },
     { level: 40, title: "Level 40: Botmap2 Master Stage", blueUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Tank', type: 'land', range: 3}], redUnits: [{name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}], customRedPos: [{c: 11, r: 7}, {c: 13, r: 5}, {c: 14, r: 14}], customBluePos: [{c: 0, r: 10}, {c: 1, r: 10}] },
 
-
     // --- BOTMAPINFO3: Stages 41-55 (Levels 41 to 55) - Blue Base Core at (0,6) ---
     { level: 41, title: "Level 41: Botmap3 Incursion", blueUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Tank', type: 'land', range: 3}], redUnits: [{name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}], customRedPos: [{c: 14, r: 7}], customBluePos: [{c: 0, r: 6}, {c: 1, r: 6}] },
     { level: 42, title: "Level 42: Advanced Outpost", blueUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Tank', type: 'land', range: 3}], redUnits: [{name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Infantry', type: 'land', range: 2}], customRedPos: [{c: 12, r: 10}], customBluePos: [{c: 0, r: 6}, {c: 1, r: 6}] },
@@ -67,15 +66,3 @@ const campaignLevels = [
     { level: 54, title: "Level 54: The Ultimate Gauntlet", blueUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Tank', type: 'land', range: 3}], redUnits: [{name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}], customRedPos: [{c: 12, r: 10}, {c: 14, r: 7}], customBluePos: [{c: 0, r: 6}, {c: 1, r: 6}] },
     { level: 55, title: "Level 55: Grandmaster Finale", blueUnits: [{name: 'Infantry', type: 'land', range: 2}, {name: 'Tank', type: 'land', range: 3}], redUnits: [{name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}, {name: 'Tank', type: 'land', range: 3}], customRedPos: [{c: 12, r: 10}, {c: 14, r: 7}], customBluePos: [{c: 0, r: 6}, {c: 1, r: 6}] }
 ];
-
-
-
-
-
-
-
-
-
-
-    
-    
