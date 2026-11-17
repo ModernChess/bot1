@@ -43,7 +43,7 @@ const progressBar = document.getElementById('progressBar');
 const progressText = document.getElementById('progressText');
 
 const assetEntries = [
-    { key: 'map_8', url: `${repoBaseUrl}map_8.jpg` },
+    { key: 'map_8', url: `${repoBaseUrl}map61.jpg` },
     { key: 'botmapinfo1', url: `${repoBaseUrl}botmapinfo1.jpg`, fallbackUrl: `${repoBaseUrl}botmapinfo1.png` },
     { key: 'botmapinfo2', url: `${repoBaseUrl}botmapinfo2.jpg`, fallbackUrl: `${repoBaseUrl}botmapinfo2.png` },
     { key: 'botmapinfo3', url: `${repoBaseUrl}botmapinfo3.jpg`, fallbackUrl: `${repoBaseUrl}botmapinfo3.png` },
@@ -295,7 +295,6 @@ function spawnTeam(team) {
     console.log(`[SUCCESS][map_setup] Team '${team}' successfully spawned.`);
 }
 
-spawnTeam('blue');
-spawnTeam('red');
+// Preset unit spawning removed (handled by campaign level loader / mapholder)
 
 console.log("[SUCCESS][map_setup] Strict loading controller initialized.");
